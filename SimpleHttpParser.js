@@ -58,6 +58,7 @@ function SimpleHttpParser(messages) {
                 // this message must be a body, or some mangled message.
                 // look for wireshark style messages using body length information
                 self.parseBody(messagePieces[i], self.parsedMessages[i-1]);
+                self.parsedMessages[i-1].bodyOffset = allmessages.indexOf(self.parsedMessages.entityBody);
             }
             possibleMessages--;
             console.log("OK: "+ possibleMessages+" possible HTTP message left to parse");
@@ -102,8 +103,8 @@ SimpleHttpParser.prototype.getNewMessageObj = function() {
 
 SimpleHttpParser.prototype.parseBody = function(bodyStr, messageObj) {
     var self = this,
-        cl = messageObj.headers["Content-Length"],
-        contentType = messageObj.headers["Content-Type"]; // need this to deal with multi-part
+        cl = messageObj.headerPart["Content-Length"],
+        contentType = messageObj.headerPart["Content-Type"]; // need this to deal with multi-part
         // oh... not dealing with that right now
     if (cl) {
         if (! cl == bodyStr.length) {
@@ -119,9 +120,12 @@ SimpleHttpParser.prototype.parseBody = function(bodyStr, messageObj) {
                 // deal with wireshark style message
             }
         }
+        else {
+            messageObj.entityBody = bodyStr;
+        }
     }
     else {
-        if (! messageObj.headers["Transfer-Encoding"]) {
+        if (! "Transfer-Encoding" in messageObj.headerPart) {
             throw "illegal HTTP entity: no content length or tranfer encoding";
         }
         // check for a containing request or response headers message preceeded by '0'

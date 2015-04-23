@@ -58,7 +58,8 @@ function SimpleHttpParser(messages) {
                 // this message must be a body, or some mangled message.
                 // look for wireshark style messages using body length information
                 self.parseBody(messagePieces[i], self.parsedMessages[i-1]);
-                self.parsedMessages[i-1].bodyOffset = allmessages.indexOf(self.parsedMessages.entityBody);
+                self.parsedMessages[i-1].bodyOffset = allmessages.indexOf(self.parsedMessages[i-1].entityBody);
+                self.parsedMessages[i-1].bodyEnd = self.parsedMessages[i-1].bodyOffset+self.parsedMessages[i-1].entityBody.length - 1;
             }
             possibleMessages--;
             console.log("OK: "+ possibleMessages+" possible HTTP message left to parse");

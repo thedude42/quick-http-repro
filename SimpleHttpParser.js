@@ -29,8 +29,10 @@ function SimpleHttpParser(messages) {
         // use allmessages.indexOf(messagePieces[i]) to get offset value of body
         //--
         // use for loop so we can look forward and backward in the array
-        for (var i = 0; i < messagePieces.length; i++) {
-
+        // invariant: messagePieces[0 -> i-1] have all been associated with either a message header or a complete entity body
+        var i = -1;
+        while ( i < messagePieces.length ) {
+            i++;
             var messageObj;
             if (messagePieces[i].search(self.rqstLineRegex) == 0) {
                 console.log("OK: identified REQUEST")
@@ -53,11 +55,55 @@ function SimpleHttpParser(messages) {
             }
             else {
                 if (i == 0) {
-                    throw "file "+inFile+"begins with an incomplete http message";
+                    throw "file "+inFile+" begins with an incomplete http message";
+                }
+                /* strategy: examine messagePieces[i-1] for headers Content-Length or TE/Transfer-Encoding.
+                             if Content-Length, count messagePieces[i,i++] until we have Content-Length number
+                              of bytes and fix i
+                             if chunked TE, split bodies on \r\n and find the chunk terminator, verify the
+                              length of the preceeding chunk against its length header
+                */
+                var cl = self.parsedMessages.headerPart["Content-Length"],
+                    contentType = self.parsedMessages.headerPart["Content-Type"];
+                if (!cl) {
+                    // TODO: fix all of this body parsing stuff
+                }
+                else {
+                    if (cl == messagePieces[i]) {
+                        self.parsedMessages[i-1].entityBody = messagePieces[i];
+                        self.parsedMessages[i-1].bodyOffset = allmessages.indexOf(messagePieces[i]);
+                        self.parsedMessages[i-1].bodyEnd = self.parsedMessages[i-1].bodyOffset + messagePieces[i].length - 1;
+                        continue;
+                    }
+                }
+                var bodyCollection = [],
+                    bodyByteCount = 0;
+                for (var j = i; j < messagePieces.length; j++i) {
+                    if (messagePieces[j].search(self.rqstLineRegex) != -1 ||
+                    messagePieces[j].search(self.respLineRegex) != -1) {
+                        //now we know the next piece is probably a body part,
+                        bodyCollection.push(messagePieces[j]);
+                        bodyByteCount += messagePieces[j].length;
+                        if (cl) {
+                            if (cl != bodyByteCount) {
+                                continue
+                            }
+                            else {
+                                self.parsedMessages[i-1].entityBody = Buffer.concat(bodyCollection, bodyByteCount);
+                                self.parsedMessages[i-1].bodyOffset = allmessages.indexOf(messagePieces[i]);
+                                self.parsedMessages[i-1].bodyEnd = self.parsedMessages[i-1].bodyOffset + messagePieces[i].length - 1;
+                                i = j;
+                            }
+                        }
+                        else {
+
+                        }
+                    }
                 }
                 // this message must be a body, or some mangled message.
                 // look for wireshark style messages using body length information
                 self.parseBody(messagePieces[i], self.parsedMessages[i-1]);
+                // these should probably be set in the parseBody method
                 self.parsedMessages[i-1].bodyOffset = allmessages.indexOf(self.parsedMessages[i-1].entityBody);
                 self.parsedMessages[i-1].bodyEnd = self.parsedMessages[i-1].bodyOffset+self.parsedMessages[i-1].entityBody.length - 1;
             }
@@ -83,8 +129,10 @@ SimpleHttpParser.prototype.parseHeaders = function(headers) {
             throw "SimpleHttpParser found a CRLFCRLF in the middle of a 'header'";
         }
         else {
-            var aHeader = headerLines[i].split(": ");
-            // this will throw if the header line wasn't a header per HTTP RFC grammar
+            var aHeader = headerLines[i].split(":");
+            if (aHeader.length != 2) {
+                throw "malformed header line";
+            }
             headerObj.headers[aHeader[0]] = aHeader[1];
         }
     }
@@ -147,5 +195,6 @@ SimpleHttpParser.prototype.parseBody = function(bodyStr, messageObj) {
         }
     }
 }
+
 
 exports.SimpleHttpParser = SimpleHttpParser;

@@ -31,7 +31,7 @@ function SimpleHttpParser(messages) {
         // use for loop so we can look forward and backward in the array
         // invariant: messagePieces[0 -> i-1] have all been associated with either a message header or a complete entity body
         var i = -1;
-        while ( i < messagePieces.length ) {
+        while ( i < messagePieces.length - 1 ) {
             i++;
             var messageObj;
             if (messagePieces[i].search(self.rqstLineRegex) == 0) {
@@ -53,7 +53,8 @@ function SimpleHttpParser(messages) {
                 console.log("OK: empty string found in message pieces at index "+i);
                 continue;
             }
-            else {
+            else { // case: messagePieces[i] is the start of or an entire entity body (wireshark OR tcpflow),
+                   //       -OR- a wireshark body+next header
                 if (i == 0) {
                     throw "file "+inFile+" begins with an incomplete http message";
                 }
@@ -63,18 +64,21 @@ function SimpleHttpParser(messages) {
                              if chunked TE, split bodies on \r\n and find the chunk terminator, verify the
                               length of the preceeding chunk against its length header
                 */
-                var cl = self.parsedMessages.headerPart["Content-Length"],
-                    contentType = self.parsedMessages.headerPart["Content-Type"];
-                if (!cl) {
-                    // TODO: fix all of this body parsing stuff
+                var contentLength = self.parsedMessages[i-1].headerPart["Content-Length"],
+                    contentType = self.parsedMessages[i-1].headerPart["Content-Type"],
+                    transferEncosding = self.parsedMessages[i-1]["Transfer-Encoding"] ||
+                                            self.parsedMessages[i-1]["TE"];
+
+                if ( (contentLength && contentLength == messagePieces[i]) ||
+                     (transferEncoding && verifyEntityChunks(messagePieces.slice(i,i+1))) ) { // happy path
+                    self.parsedMessages[i-1].entityBody = messagePieces[i];
+                    self.parsedMessages[i-1].bodyOffset = allmessages.indexOf(messagePieces[i]);
+                    self.parsedMessages[i-1].bodyEnd = self.parsedMessages[i-1].bodyOffset +
+                                                        messagePieces[i].length - 1;
+                    continue;
                 }
-                else {
-                    if (cl == messagePieces[i]) {
-                        self.parsedMessages[i-1].entityBody = messagePieces[i];
-                        self.parsedMessages[i-1].bodyOffset = allmessages.indexOf(messagePieces[i]);
-                        self.parsedMessages[i-1].bodyEnd = self.parsedMessages[i-1].bodyOffset + messagePieces[i].length - 1;
-                        continue;
-                    }
+                else if (! contentLength && transferEncoding) {
+
                 }
                 var bodyCollection = [],
                     bodyByteCount = 0;
@@ -84,8 +88,8 @@ function SimpleHttpParser(messages) {
                         //now we know the next piece is probably a body part,
                         bodyCollection.push(messagePieces[j]);
                         bodyByteCount += messagePieces[j].length;
-                        if (cl) {
-                            if (cl != bodyByteCount) {
+                        if (contentLength) {
+                            if (contentLength != bodyByteCount) {
                                 continue
                             }
                             else {
@@ -150,13 +154,45 @@ SimpleHttpParser.prototype.getNewMessageObj = function() {
     return {type:undefined, headers:undefined, entityBody:undefined};
 }
 
+SimpleHttpParser.prototype.verifyEntityChunks = function(entityChunks) {
+    var wholeEntity;
+    if (entityChunks.length == 1) {
+        wholeEntity = chunks[0];
+    }
+    else {
+        entityChunksByteCount = 0;
+        entityChunks.forEach(function(chunk) {
+            entityChunksByteCount += chunk.length;
+        });
+        wholeEntity = Buffer.concat(wholeEntity, entityChunksByteCount);
+    }
+    httpChunks = wholeEntity.split("\r\n");
+    if (! httpChunks[httpChunks.length-1] == 0) {
+        throw "not implemented: deal with chunked-body trailer, or off-by-one bug in chunked TE handling";
+    }
+    else {
+        chunkLenRegex = /(0x[a-fA-f0-9]+) .*/;
+        for (var i = 0; i < httpChunks.length - 1; i += 2) {
+            var match = chunkLenRegex.exec(httpChunks[i]);
+            if (match) {
+                //TODO: pick up here, convert hex string to num and compare value to httpChunks[i].length
+            }
+            else {
+                throw "malformed http body chunk";
+            }
+        }
+    }
+
+
+}
+
 SimpleHttpParser.prototype.parseBody = function(bodyStr, messageObj) {
     var self = this,
-        cl = messageObj.headerPart["Content-Length"],
+        contentLength = messageObj.headerPart["Content-Length"],
         contentType = messageObj.headerPart["Content-Type"]; // need this to deal with multi-part
         // oh... not dealing with that right now
-    if (cl) {
-        if (! cl == bodyStr.length) {
+    if (contentLength) {
+        if (! contentLength == bodyStr.length) {
             var idxRqst = bodyStr.search(self.rqstLineRegex);
             var idxResp = bodyStr.search(self.respLineRegex);
             if (idxRqst == -1 && idxResp == -1) {
@@ -166,7 +202,7 @@ SimpleHttpParser.prototype.parseBody = function(bodyStr, messageObj) {
                 throw "malformed source file, multiple missing CRLFCRLF sequences"
             }
             else {
-                // deal with wireshark style message
+                throw "not implemented: wireshark style";
             }
         }
         else {
@@ -195,6 +231,5 @@ SimpleHttpParser.prototype.parseBody = function(bodyStr, messageObj) {
         }
     }
 }
-
 
 exports.SimpleHttpParser = SimpleHttpParser;

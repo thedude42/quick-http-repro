@@ -1,0 +1,11 @@
+GET /css?family=Source+Sans+Pro:400,600,400italic,600italic HTTP/1.1
+Host: fonts.googleapis.com
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:37.0) Gecko/20100101 Firefox/37.0
+Accept: text/css,*/*;q=0.1
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://techreport.com/stylenew.20141114.css
+DNT: 1
+Connection: keep-alive
+Cache-Control: max-age=0
+

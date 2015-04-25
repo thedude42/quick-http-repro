@@ -1,0 +1,122 @@
+GET /styletoggle.js HTTP/1.1
+Host: techreport.com
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:37.0) Gecko/20100101 Firefox/37.0
+Accept: */*
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://techreport.com/review/24841/introducing-the-ssd-endurance-experiment
+Cookie: PHPSESSID=jtk8nqsb3o2ho99qjauiugjlo2; tr_view=desktop
+DNT: 1
+Connection: keep-alive
+If-Modified-Since: Tue, 04 Sep 2007 17:01:03 GMT
+If-None-Match: "658f-2f8-439523bf731c0"
+Cache-Control: max-age=0
+
+GET /gallery/img.x?sz=gallery_thumb&id=79180 HTTP/1.1
+Host: techreport.com
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:37.0) Gecko/20100101 Firefox/37.0
+Accept: image/png,image/*;q=0.8,*/*;q=0.5
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://techreport.com/review/24841/introducing-the-ssd-endurance-experiment
+Cookie: PHPSESSID=jtk8nqsb3o2ho99qjauiugjlo2; tr_view=desktop
+DNT: 1
+Connection: keep-alive
+
+GET /gallery/img.x?sz=gallery_thumb&id=79419 HTTP/1.1
+Host: techreport.com
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:37.0) Gecko/20100101 Firefox/37.0
+Accept: image/png,image/*;q=0.8,*/*;q=0.5
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://techreport.com/review/24841/introducing-the-ssd-endurance-experiment
+Cookie: PHPSESSID=jtk8nqsb3o2ho99qjauiugjlo2; tr_view=desktop
+DNT: 1
+Connection: keep-alive
+If-Modified-Since: Wed, 08 Apr 2015 17:34:12 GMT
+Cache-Control: max-age=0
+
+GET /imgnew/filmstrip_arrows-1221.png HTTP/1.1
+Host: techreport.com
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:37.0) Gecko/20100101 Firefox/37.0
+Accept: image/png,image/*;q=0.8,*/*;q=0.5
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://techreport.com/stylenew.20141114.css
+Cookie: PHPSESSID=jtk8nqsb3o2ho99qjauiugjlo2; tr_view=desktop
+DNT: 1
+Connection: keep-alive
+If-Modified-Since: Tue, 21 Dec 2010 08:18:28 GMT
+If-None-Match: "6ea043-5be-497e747ff5d00"
+Cache-Control: max-age=0
+
+GET /imgnew/topcomments-big.png HTTP/1.1
+Host: techreport.com
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:37.0) Gecko/20100101 Firefox/37.0
+Accept: image/png,image/*;q=0.8,*/*;q=0.5
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://techreport.com/stylenew.20141114.css
+Cookie: PHPSESSID=jtk8nqsb3o2ho99qjauiugjlo2; tr_view=desktop
+DNT: 1
+Connection: keep-alive
+If-Modified-Since: Mon, 11 Apr 2011 16:22:19 GMT
+If-None-Match: "6ea084-360-4a0a6fac3e4c0"
+Cache-Control: max-age=0
+
+GET /imgnew/bg3.png HTTP/1.1
+Host: techreport.com
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:37.0) Gecko/20100101 Firefox/37.0
+Accept: image/png,image/*;q=0.8,*/*;q=0.5
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://techreport.com/stylenew.20141114.css
+Cookie: PHPSESSID=jtk8nqsb3o2ho99qjauiugjlo2; tr_view=desktop
+DNT: 1
+Connection: keep-alive
+If-Modified-Since: Fri, 10 Dec 2010 17:27:49 GMT
+If-None-Match: "6ea03c-12e-49711ac5f2f40"
+Cache-Control: max-age=0
+
+GET /imgnew/toplinks2.png HTTP/1.1
+Host: techreport.com
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:37.0) Gecko/20100101 Firefox/37.0
+Accept: image/png,image/*;q=0.8,*/*;q=0.5
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://techreport.com/stylenew.20141114.css
+Cookie: PHPSESSID=jtk8nqsb3o2ho99qjauiugjlo2; tr_view=desktop
+DNT: 1
+Connection: keep-alive
+If-Modified-Since: Thu, 09 Dec 2010 20:48:24 GMT
+If-None-Match: "6ea08b-1da8-497005bdf5600"
+Cache-Control: max-age=0
+
+GET /imgnew/morebg2.png HTTP/1.1
+Host: techreport.com
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:37.0) Gecko/20100101 Firefox/37.0
+Accept: image/png,image/*;q=0.8,*/*;q=0.5
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://techreport.com/stylenew.20141114.css
+Cookie: PHPSESSID=jtk8nqsb3o2ho99qjauiugjlo2; tr_view=desktop
+DNT: 1
+Connection: keep-alive
+If-Modified-Since: Mon, 13 Dec 2010 00:14:30 GMT
+If-None-Match: "6ea05a-3b6-4973f9677a580"
+Cache-Control: max-age=0
+
+GET /imgnew/style-toggle.png HTTP/1.1
+Host: techreport.com
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:37.0) Gecko/20100101 Firefox/37.0
+Accept: image/png,image/*;q=0.8,*/*;q=0.5
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://techreport.com/stylenew.20141114.css
+Cookie: PHPSESSID=jtk8nqsb3o2ho99qjauiugjlo2; tr_view=desktop
+DNT: 1
+Connection: keep-alive
+If-Modified-Since: Fri, 18 Feb 2011 08:02:06 GMT
+If-None-Match: "6ea07c-266-49c89ee1a5b80"
+Cache-Control: max-age=0
+

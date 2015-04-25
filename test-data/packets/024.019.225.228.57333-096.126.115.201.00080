@@ -1,0 +1,124 @@
+GET /stylenew.20141114.css HTTP/1.1
+Host: techreport.com
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:37.0) Gecko/20100101 Firefox/37.0
+Accept: text/css,*/*;q=0.1
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://techreport.com/review/24841/introducing-the-ssd-endurance-experiment
+Cookie: PHPSESSID=jtk8nqsb3o2ho99qjauiugjlo2; tr_view=desktop
+DNT: 1
+Connection: keep-alive
+If-Modified-Since: Wed, 03 Dec 2014 22:29:57 GMT
+If-None-Match: "6ae0d4-f39d-509576225c340"
+Cache-Control: max-age=0
+
+GET /include/yui/2.4/utilities.js HTTP/1.1
+Host: techreport.com
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:37.0) Gecko/20100101 Firefox/37.0
+Accept: */*
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://techreport.com/review/24841/introducing-the-ssd-endurance-experiment
+Cookie: PHPSESSID=jtk8nqsb3o2ho99qjauiugjlo2; tr_view=desktop
+DNT: 1
+Connection: keep-alive
+If-Modified-Since: Sun, 24 Feb 2008 23:01:00 GMT
+If-None-Match: "11ac7-147a7-446ef6dcb2300"
+Cache-Control: max-age=0
+
+GET /r.x/ssd-endurance-0513/software-anvil.jpg HTTP/1.1
+Host: techreport.com
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:37.0) Gecko/20100101 Firefox/37.0
+Accept: image/png,image/*;q=0.8,*/*;q=0.5
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://techreport.com/review/24841/introducing-the-ssd-endurance-experiment
+Cookie: PHPSESSID=jtk8nqsb3o2ho99qjauiugjlo2; tr_view=desktop
+DNT: 1
+Connection: keep-alive
+If-Modified-Since: Tue, 21 May 2013 04:26:40 GMT
+Cache-Control: max-age=0
+
+GET /imgnew/rightcol-head3.png HTTP/1.1
+Host: techreport.com
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:37.0) Gecko/20100101 Firefox/37.0
+Accept: image/png,image/*;q=0.8,*/*;q=0.5
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://techreport.com/stylenew.20141114.css
+Cookie: PHPSESSID=jtk8nqsb3o2ho99qjauiugjlo2; tr_view=desktop
+DNT: 1
+Connection: keep-alive
+If-Modified-Since: Mon, 13 Dec 2010 05:11:27 GMT
+If-None-Match: "6ea070-9e2-49743bc717dc0"
+Cache-Control: max-age=0
+
+GET /imgnew/topcomments-small.png HTTP/1.1
+Host: techreport.com
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:37.0) Gecko/20100101 Firefox/37.0
+Accept: image/png,image/*;q=0.8,*/*;q=0.5
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://techreport.com/stylenew.20141114.css
+Cookie: PHPSESSID=jtk8nqsb3o2ho99qjauiugjlo2; tr_view=desktop
+DNT: 1
+Connection: keep-alive
+If-Modified-Since: Mon, 11 Apr 2011 16:17:55 GMT
+If-None-Match: "6ea087-26e-4a0a6eb0792c0"
+Cache-Control: max-age=0
+
+GET /gallery/img.x?sz=gallery_thumb&id=66135 HTTP/1.1
+Host: techreport.com
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:37.0) Gecko/20100101 Firefox/37.0
+Accept: image/png,image/*;q=0.8,*/*;q=0.5
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://techreport.com/review/24841/introducing-the-ssd-endurance-experiment
+Cookie: PHPSESSID=jtk8nqsb3o2ho99qjauiugjlo2; tr_view=desktop
+DNT: 1
+Connection: keep-alive
+If-Modified-Since: Tue, 21 May 2013 04:26:01 GMT
+Cache-Control: max-age=0
+
+GET /imgnew/navbar2.png HTTP/1.1
+Host: techreport.com
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:37.0) Gecko/20100101 Firefox/37.0
+Accept: image/png,image/*;q=0.8,*/*;q=0.5
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://techreport.com/stylenew.20141114.css
+Cookie: PHPSESSID=jtk8nqsb3o2ho99qjauiugjlo2; tr_view=desktop
+DNT: 1
+Connection: keep-alive
+If-Modified-Since: Thu, 09 Dec 2010 20:51:31 GMT
+If-None-Match: "6ea05f-654-497006704bac0"
+Cache-Control: max-age=0
+
+GET /imgnew/toplinks-toggle3.png HTTP/1.1
+Host: techreport.com
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:37.0) Gecko/20100101 Firefox/37.0
+Accept: image/png,image/*;q=0.8,*/*;q=0.5
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://techreport.com/stylenew.20141114.css
+Cookie: PHPSESSID=jtk8nqsb3o2ho99qjauiugjlo2; tr_view=desktop
+DNT: 1
+Connection: keep-alive
+If-Modified-Since: Sat, 25 Dec 2010 04:59:42 GMT
+If-None-Match: "6ea08a-26b-49834f8848b80"
+Cache-Control: max-age=0
+
+GET /imgnew/articles-footer-bubble.png HTTP/1.1
+Host: techreport.com
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:37.0) Gecko/20100101 Firefox/37.0
+Accept: image/png,image/*;q=0.8,*/*;q=0.5
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://techreport.com/stylenew.20141114.css
+Cookie: PHPSESSID=jtk8nqsb3o2ho99qjauiugjlo2; tr_view=desktop
+DNT: 1
+Connection: keep-alive
+If-Modified-Since: Wed, 15 Dec 2010 03:15:37 GMT
+If-None-Match: "6ea037-1ca-4976a59dfa840"
+Cache-Control: max-age=0
+

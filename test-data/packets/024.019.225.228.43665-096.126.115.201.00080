@@ -1,0 +1,111 @@
+GET /print.20140905.css HTTP/1.1
+Host: techreport.com
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:37.0) Gecko/20100101 Firefox/37.0
+Accept: text/css,*/*;q=0.1
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://techreport.com/review/24841/introducing-the-ssd-endurance-experiment
+Cookie: PHPSESSID=jtk8nqsb3o2ho99qjauiugjlo2; tr_view=desktop
+DNT: 1
+Connection: keep-alive
+If-Modified-Since: Fri, 05 Sep 2014 22:50:03 GMT
+If-None-Match: "6ae0d0-600-502594a277cc0"
+Cache-Control: max-age=0
+
+GET /javascript/tr_auto_affiliate.min.20141125.js HTTP/1.1
+Host: techreport.com
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:37.0) Gecko/20100101 Firefox/37.0
+Accept: */*
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://techreport.com/review/24841/introducing-the-ssd-endurance-experiment
+Cookie: PHPSESSID=jtk8nqsb3o2ho99qjauiugjlo2; tr_view=desktop
+DNT: 1
+Connection: keep-alive
+If-Modified-Since: Tue, 25 Nov 2014 22:35:39 GMT
+If-None-Match: "6e601a-87e-508b687cd44c0"
+Cache-Control: max-age=0
+
+GET /imgnew/subs/rightcolguide.png HTTP/1.1
+Host: techreport.com
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:37.0) Gecko/20100101 Firefox/37.0
+Accept: image/png,image/*;q=0.8,*/*;q=0.5
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://techreport.com/stylenew.20141114.css
+Cookie: PHPSESSID=jtk8nqsb3o2ho99qjauiugjlo2; tr_view=desktop
+DNT: 1
+Connection: keep-alive
+If-Modified-Since: Fri, 23 Aug 2013 19:48:37 GMT
+If-None-Match: "1195a-2b99-4e4a2b1488f40"
+Cache-Control: max-age=0
+
+GET /imgnew/fp/bullet.png HTTP/1.1
+Host: techreport.com
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:37.0) Gecko/20100101 Firefox/37.0
+Accept: image/png,image/*;q=0.8,*/*;q=0.5
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://techreport.com/stylenew.20141114.css
+Cookie: PHPSESSID=jtk8nqsb3o2ho99qjauiugjlo2; tr_view=desktop
+DNT: 1
+Connection: keep-alive
+If-Modified-Since: Sun, 05 Dec 2010 04:07:39 GMT
+If-None-Match: "11933-9f-496a1e98bd8c0"
+Cache-Control: max-age=0
+
+GET /imgnew/topcomments-fade.png HTTP/1.1
+Host: techreport.com
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:37.0) Gecko/20100101 Firefox/37.0
+Accept: image/png,image/*;q=0.8,*/*;q=0.5
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://techreport.com/stylenew.20141114.css
+Cookie: PHPSESSID=jtk8nqsb3o2ho99qjauiugjlo2; tr_view=desktop
+DNT: 1
+Connection: keep-alive
+If-Modified-Since: Wed, 13 Apr 2011 01:49:02 GMT
+If-None-Match: "6ea086-171-4a0c30357df80"
+Cache-Control: max-age=0
+
+GET /gallery/img.x?sz=gallery_thumb&id=66140 HTTP/1.1
+Host: techreport.com
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:37.0) Gecko/20100101 Firefox/37.0
+Accept: image/png,image/*;q=0.8,*/*;q=0.5
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://techreport.com/review/24841/introducing-the-ssd-endurance-experiment
+Cookie: PHPSESSID=jtk8nqsb3o2ho99qjauiugjlo2; tr_view=desktop
+DNT: 1
+Connection: keep-alive
+If-Modified-Since: Tue, 21 May 2013 04:26:15 GMT
+Cache-Control: max-age=0
+
+GET /imgnew/google_custom_search_watermark.gif HTTP/1.1
+Host: techreport.com
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:37.0) Gecko/20100101 Firefox/37.0
+Accept: image/png,image/*;q=0.8,*/*;q=0.5
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://techreport.com/stylenew.20141114.css
+Cookie: PHPSESSID=jtk8nqsb3o2ho99qjauiugjlo2; tr_view=desktop
+DNT: 1
+Connection: keep-alive
+If-Modified-Since: Thu, 30 Jan 2014 18:24:34 GMT
+If-None-Match: "6ea054-7e8-4f1342b4e7c80"
+Cache-Control: max-age=0
+
+GET /imgnew/subs/singlepage-print.png HTTP/1.1
+Host: techreport.com
+User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:37.0) Gecko/20100101 Firefox/37.0
+Accept: image/png,image/*;q=0.8,*/*;q=0.5
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate
+Referer: http://techreport.com/stylenew.20141114.css
+Cookie: PHPSESSID=jtk8nqsb3o2ho99qjauiugjlo2; tr_view=desktop
+DNT: 1
+Connection: keep-alive
+If-Modified-Since: Thu, 05 Sep 2013 19:04:31 GMT
+If-None-Match: "11960-4e7-4e5a79781adc0"
+Cache-Control: max-age=0
+

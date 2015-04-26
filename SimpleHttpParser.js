@@ -24,37 +24,28 @@ function SimpleHttpParser(messages) {
         chunks = Buffer.concat(chunks, totalLen);
         var allmessages = chunks.toString('ascii');
         var messagePieces = allmessages.split("\r\n\r\n");
-        var possibleMessages = messagePieces.length;
+        var possibleMessages = messagePieces.length+1;
         console.log("OK: identified "+messagePieces.length+" potential HTTP messages in stream")
         // use allmessages.indexOf(messagePieces[i]) to get offset value of body
         //--
-        // use for loop so we can look forward and backward in the array
+        // use while loop so we can look forward and backward in the array
         // invariant: messagePieces[0 -> i-1] have all been associated with either a message header or a complete entity body
         var i = -1;
         while ( i < messagePieces.length - 1 ) {
             i++;
-            var messageObj;
-            if (messagePieces[i].search(self.rqstLineRegex) == 0) {
-                console.log("OK: identified REQUEST")
-                messageObj = self.getNewMessageObj();
-                // piece at index i is a REQUEST
-                // if GET or HEAD or OPTIONS or TRACE, don't look for a body
-                messageObj.type = 'request';
+            possibleMessages--;
+            console.log("OK: "+ possibleMessages+" possible HTTP message left to parse");
+            var messageObj = {type:self.getMessageType(messagePieces[i])}
+            if (messageObj.type == "request" || messageObj.type == "response") {
                 messageObj.headerPart = self.parseHeaders(messagePieces[i]);
                 self.parsedMessages.push(messageObj);
+                continue;
             }
-            else if (messagePieces[i].search(self.respLineRegex) == 0) {
-                messageObj = self.getNewMessageObj();
-                messageObj.type = 'response';
-                messageObj.headerPart = self.parseHeaders(messagePieces[i]);
-                self.parsedMessages.push(messageObj);
-            }
-            else if (messagePieces[i] == "") {
+            else if (messageObj.type == "empty") {
                 console.log("OK: empty string found in message pieces at index "+i);
                 continue;
             }
-            else { // case: messagePieces[i] is the start of or an entire entity body (wireshark OR tcpflow),
-                   //       -OR- a wireshark body+next header
+            else { // case: messagePieces[i] is not a single complete http header; maybe http body data
                 if (i == 0) {
                     throw "file "+inFile+" begins with an incomplete http message";
                 }
@@ -64,55 +55,88 @@ function SimpleHttpParser(messages) {
                              if chunked TE, split bodies on \r\n and find the chunk terminator, verify the
                               length of the preceeding chunk against its length header
                 */
-                var contentLength = self.parsedMessages[i-1].headerPart["Content-Length"],
-                    contentType = self.parsedMessages[i-1].headerPart["Content-Type"],
-                    transferEncosding = self.parsedMessages[i-1]["Transfer-Encoding"] ||
-                                            self.parsedMessages[i-1]["TE"];
-
-                if ( (contentLength && contentLength == messagePieces[i]) ||
-                     (transferEncoding && verifyEntityChunks(messagePieces.slice(i,i+1))) ) { // happy path
-                    self.parsedMessages[i-1].entityBody = messagePieces[i];
-                    self.parsedMessages[i-1].bodyOffset = allmessages.indexOf(messagePieces[i]);
-                    self.parsedMessages[i-1].bodyEnd = self.parsedMessages[i-1].bodyOffset +
-                                                        messagePieces[i].length - 1;
+                var contentLength = self.parsedMessages[self.parsedMessages.length-1].headerPart.headers["Content-Length"],
+                    contentType =
+                    self.parsedMessages[self.parsedMessages.length-1].headerPart.headers["Content-Type"],
+                    transferEncoding =
+                    self.parsedMessages[self.parsedMessages.length-1].headerPart.headers["Transfer-Encoding"] ||
+                    self.parsedMessages[self.parsedMessages.length-1].headerPart.headers["TE"];
+            console.log(self.parsedMessages[self.parsedMessages.length-1].headerPart.headers['Transfer-Encoding']);
+                if (messageObj.type == "chunklen") {
+                    if (! transferEncoding) {
+                        throw "malformed message: looks like chunk length but no transfer-encoding header\n"+messagePieces[i];
+                    }
+                    var lastChunk = i+2;
+                    for (lastChunk; i < messagePieces.length; lastChunk += 2) {
+                        if (self.getMessageType(messagePieces[lastChunk]) != "chunklen") {
+                            break;
+                        }
+                    }
+                    body = self.mergeChunks(messagePieces.slice(i,lastChunk));
+                    self.addBodyToParsedMessage(body);
+                }
+                if ( (contentLength && contentLength == messagePieces[i].length)) { // happy path
+                    self.addBodyToParsedMessage(messagePieces[i]);
                     continue;
                 }
-                else if (! contentLength && transferEncoding) {
-
+                else if (contentLength &&
+                contentLength < messagePieces[i].length &&
+                messageObj.type == "wireshark") { //wireshark style content-length body
+                    self.addBodyToParsedMessage(messagePieces[i].substr(0,contentLength));
+                    // process the rest of the message as a header
+                    messageObj.type =
+                     self.getMessageType(messagePieces[i].substr(contentLength,messagePieces[i].length));
+                    messageObj.headerPart =
+                     self.parseHeaders(messagePieces[i].substr(contentLength,messagePieces[i].length));
+                    self.parsedMessages.push(messageObj);
+                    continue;
                 }
+                else if (transferEncoding) {
+                    console.log("doing chunked message");
+                    var chunkedObj = self.findAndMergeChunks(messagePieces.slice(i));
+                    self.addBodyToParsedMessage(chunkedObj.chunk);
+                    if (chunkedObj.headers) {
+                        messageObj.type = "request";
+                        messageObj.headerPart = chunkedObj.headers;
+                        self.parsedMessages.push(messageObj);
+                        i += chunkedObj.pieces;
+                        continue;
+                    }
+                }
+                /* if we get here, we need to concatenate any messagePieces from i => i+n-1 where
+                   n is the total number of messagePieces members comprising the next HTTP message
+                   body associated with parsedMessages[i-1]
+                   TODO: test data doesn't cover this code path yet so for now we throw
+                */
+                throw "unimplemented code path, and this is a bug with the current test data:\n"+messagePieces[i];
                 var bodyCollection = [],
                     bodyByteCount = 0;
-                for (var j = i; j < messagePieces.length; j++i) {
+                for (var j = i; j < messagePieces.length; j++) {
                     if (messagePieces[j].search(self.rqstLineRegex) != -1 ||
                     messagePieces[j].search(self.respLineRegex) != -1) {
                         //now we know the next piece is probably a body part,
                         bodyCollection.push(messagePieces[j]);
                         bodyByteCount += messagePieces[j].length;
-                        if (contentLength) {
+                        if (contentLength) { // the side-effect of this algorithm is that parsedMessages ends up being sparse, with 'undefined' members
                             if (contentLength != bodyByteCount) {
                                 continue
                             }
                             else {
-                                self.parsedMessages[i-1].entityBody = Buffer.concat(bodyCollection, bodyByteCount);
-                                self.parsedMessages[i-1].bodyOffset = allmessages.indexOf(messagePieces[i]);
-                                self.parsedMessages[i-1].bodyEnd = self.parsedMessages[i-1].bodyOffset + messagePieces[i].length - 1;
+                                self.parsedMessages[self.parsedMessages.length-1].entityBody = Buffer.concat(bodyCollection, bodyByteCount);
+                                self.parsedMessages[self.parsedMessages.length-1].bodyOffset = allmessages.indexOf(messagePieces[i]);
+                                self.parsedMessages[self.parsedMessages.length-1].bodyEnd = self.parsedMessages[self.parsedMessages.length-1].bodyOffset + messagePieces[i].length - 1;
                                 i = j;
                             }
                         }
                         else {
-
+                            throw "collecting really wierd chunked encodings not yest supported";
                         }
                     }
+                    else {
+
+                    }
                 }
-                // this message must be a body, or some mangled message.
-                // look for wireshark style messages using body length information
-                self.parseBody(messagePieces[i], self.parsedMessages[i-1]);
-                // these should probably be set in the parseBody method
-                self.parsedMessages[i-1].bodyOffset = allmessages.indexOf(self.parsedMessages[i-1].entityBody);
-                self.parsedMessages[i-1].bodyEnd = self.parsedMessages[i-1].bodyOffset+self.parsedMessages[i-1].entityBody.length - 1;
             }
-            possibleMessages--;
-            console.log("OK: "+ possibleMessages+" possible HTTP message left to parse");
         }
         console.log("OK: parsed all messages");
         self.emit('done', self.parsedMessages);
@@ -120,6 +144,38 @@ function SimpleHttpParser(messages) {
 }
 
 SimpleHttpParser.prototype.__proto__ = events.EventEmitter.prototype;
+
+SimpleHttpParser.prototype.getMessageType = function(str) {
+    if (str.search(this.respLineRegex) == 0) {
+        return "response";
+    }
+    else if (str.search(this.rqstLineRegex) == 0) {
+        return "request";
+    }
+    else if (str.search(/[0-9a-fA-F] ?.*/)) {
+        return "chunklen";
+    }
+    else if (str.search(this.respLineRegex) != -1 &&
+             str.search(this.rqstLineRegex) != -1) {
+        return "both";
+    }
+    else if (str.search(this.rqstLineRegex) > 0) {
+        this.isWireshark = true;
+        return "wireshark";
+    }
+    else if (str == "") {
+        return "empty";
+    }
+    else if (str.search(this.respLineRegex) == -1 &&
+             str.search(this.rqstLineRegex) == -1) {
+        return "body";
+    }
+    else {
+        // case: we found a response line somewhere inside a content with no CRLFCRLF separation
+        // only way to figure out is to count body length values and compare
+        return "mangled";
+    }
+}
 
 SimpleHttpParser.prototype.parseHeaders = function(headers) {
     var headerLines = headers.split("\r\n"),
@@ -135,9 +191,9 @@ SimpleHttpParser.prototype.parseHeaders = function(headers) {
         else {
             var aHeader = headerLines[i].split(":");
             if (aHeader.length != 2) {
-                throw "malformed header line";
+                headerObj.headers[aHeader[0]] = headerLines[i].substr(aHeader[0].length+1, headerLines.length);
             }
-            headerObj.headers[aHeader[0]] = aHeader[1];
+            headerObj.headers[aHeader[0].trim()] = aHeader[1].trim();
         }
     }
     if (headerObj["Content-Type"] &&
@@ -154,82 +210,27 @@ SimpleHttpParser.prototype.getNewMessageObj = function() {
     return {type:undefined, headers:undefined, entityBody:undefined};
 }
 
-SimpleHttpParser.prototype.verifyEntityChunks = function(entityChunks) {
-    var wholeEntity;
-    if (entityChunks.length == 1) {
-        wholeEntity = chunks[0];
-    }
-    else {
-        entityChunksByteCount = 0;
-        entityChunks.forEach(function(chunk) {
-            entityChunksByteCount += chunk.length;
-        });
-        wholeEntity = Buffer.concat(wholeEntity, entityChunksByteCount);
-    }
-    httpChunks = wholeEntity.split("\r\n");
-    if (! httpChunks[httpChunks.length-1] == 0) {
-        throw "not implemented: deal with chunked-body trailer, or off-by-one bug in chunked TE handling";
-    }
-    else {
-        chunkLenRegex = /(0x[a-fA-f0-9]+) .*/;
-        for (var i = 0; i < httpChunks.length - 1; i += 2) {
-            var match = chunkLenRegex.exec(httpChunks[i]);
-            if (match) {
-                //TODO: pick up here, convert hex string to num and compare value to httpChunks[i].length
-            }
-            else {
-                throw "malformed http body chunk";
-            }
-        }
-    }
-
-
+SimpleHttpParser.prototype.addBodyToParsedMessage = function(bodyStr) {
+    this.parsedMessages[this.parsedMessages.length-1].entityBody = bodyStr;
+    this.parsedMessages[this.parsedMessages.length-1].bodyOffset = allmessages.indexOf(bodyStr);
+    this.parsedMessages[this.parsedMessages.length-1].bodyEnd = this.parsedMessages[this.parsedMessages.length-1].bodyOffset + bodyStr.length - 1;
 }
 
-SimpleHttpParser.prototype.parseBody = function(bodyStr, messageObj) {
-    var self = this,
-        contentLength = messageObj.headerPart["Content-Length"],
-        contentType = messageObj.headerPart["Content-Type"]; // need this to deal with multi-part
-        // oh... not dealing with that right now
-    if (contentLength) {
-        if (! contentLength == bodyStr.length) {
-            var idxRqst = bodyStr.search(self.rqstLineRegex);
-            var idxResp = bodyStr.search(self.respLineRegex);
-            if (idxRqst == -1 && idxResp == -1) {
-                throw "illegal http entity: content length information does not match body";
-            }
-            else if (idxRqst >= 0 && idxResp >= 0){
-                throw "malformed source file, multiple missing CRLFCRLF sequences"
-            }
-            else {
-                throw "not implemented: wireshark style";
-            }
-        }
-        else {
-            messageObj.entityBody = bodyStr;
-        }
-    }
-    else {
-        if (! "Transfer-Encoding" in messageObj.headerPart) {
-            throw "illegal HTTP entity: no content length or tranfer encoding";
-        }
-        // check for a containing request or response headers message preceeded by '0'
-        var idxRqst = bodyStr.search(self.rqstLineRegex);
-        var idxResp = bodyStr.search(self.respLineRegex);
-        if (idxRqst == -1 && idxResp == -1) {
-            if (bodyStr.charAt(bodyStr.length-1) == "0" &&
-                bodyStr.charAt(bodyStr.length-2) == "\n" &&
-                bodyStr.charAt(bodyStr.length-3) == "\r") {
-                messageObj.entityBody = bodyStr;
-            }
-            else {
-                throw "Malformed or incomplete chunked transfer encoded message";
-            }
-        }
-        else {
-            // deal with wireshark style message
-        }
-    }
+SimpleHttpParser.prototype.findAndMergeChunks = function(parts) {
+
+    var totalParts = 0,
+        splitChunks = parts.split("\r\n");
+
+        
+}
+
+SimpleHttpParser.prototype.verifyChunk = function(chunklen, content) {
+    var len = parseInt("0x"+chunklen);
+    console.log("chunk len: "+len+" content.len: "+content.length);
+    if (content.length != len) {
+        return false;
+    };
+    return true;
 }
 
 exports.SimpleHttpParser = SimpleHttpParser;

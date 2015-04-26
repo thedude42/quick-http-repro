@@ -22,11 +22,11 @@ function SimpleHttpParser(messages) {
     httpMessageStream.on('end', function() {
         console.log("OK: stream read complete. #chunks:"+chunks.length+" totalLen: "+totalLen);
         chunks = Buffer.concat(chunks, totalLen);
-        var allmessages = chunks.toString('ascii');
-        var messagePieces = allmessages.split("\r\n\r\n");
+        self.allmessages = chunks.toString('ascii');
+        var messagePieces = self.allmessages.split("\r\n\r\n");
         var possibleMessages = messagePieces.length+1;
         console.log("OK: identified "+messagePieces.length+" potential HTTP messages in stream")
-        // use allmessages.indexOf(messagePieces[i]) to get offset value of body
+        // use self.allmessages.indexOf(messagePieces[i]) to get offset value of body
         //--
         // use while loop so we can look forward and backward in the array
         // invariant: messagePieces[0 -> i-1] have all been associated with either a message header or a complete entity body
@@ -61,26 +61,12 @@ function SimpleHttpParser(messages) {
                     transferEncoding =
                     self.parsedMessages[self.parsedMessages.length-1].headerPart.headers["Transfer-Encoding"] ||
                     self.parsedMessages[self.parsedMessages.length-1].headerPart.headers["TE"];
-            console.log(self.parsedMessages[self.parsedMessages.length-1].headerPart.headers['Transfer-Encoding']);
-                if (messageObj.type == "chunklen") {
-                    if (! transferEncoding) {
-                        throw "malformed message: looks like chunk length but no transfer-encoding header\n"+messagePieces[i];
-                    }
-                    var lastChunk = i+2;
-                    for (lastChunk; i < messagePieces.length; lastChunk += 2) {
-                        if (self.getMessageType(messagePieces[lastChunk]) != "chunklen") {
-                            break;
-                        }
-                    }
-                    body = self.mergeChunks(messagePieces.slice(i,lastChunk));
-                    self.addBodyToParsedMessage(body);
-                }
+
                 if ( (contentLength && contentLength == messagePieces[i].length)) { // happy path
                     self.addBodyToParsedMessage(messagePieces[i]);
                     continue;
                 }
-                else if (contentLength &&
-                contentLength < messagePieces[i].length &&
+                else if (contentLength && contentLength < messagePieces[i].length &&
                 messageObj.type == "wireshark") { //wireshark style content-length body
                     self.addBodyToParsedMessage(messagePieces[i].substr(0,contentLength));
                     // process the rest of the message as a header
@@ -94,14 +80,9 @@ function SimpleHttpParser(messages) {
                 else if (transferEncoding) {
                     console.log("doing chunked message");
                     var chunkedObj = self.findAndMergeChunks(messagePieces.slice(i));
-                    self.addBodyToParsedMessage(chunkedObj.chunk);
-                    if (chunkedObj.headers) {
-                        messageObj.type = "request";
-                        messageObj.headerPart = chunkedObj.headers;
-                        self.parsedMessages.push(messageObj);
-                        i += chunkedObj.pieces;
-                        continue;
-                    }
+                    self.addBodyToParsedMessage(chunkedObj.chunkBody);
+                    i = i + chunkedObj.totalParts - 1;
+                    continue;
                 }
                 /* if we get here, we need to concatenate any messagePieces from i => i+n-1 where
                    n is the total number of messagePieces members comprising the next HTTP message
@@ -123,7 +104,7 @@ function SimpleHttpParser(messages) {
                             }
                             else {
                                 self.parsedMessages[self.parsedMessages.length-1].entityBody = Buffer.concat(bodyCollection, bodyByteCount);
-                                self.parsedMessages[self.parsedMessages.length-1].bodyOffset = allmessages.indexOf(messagePieces[i]);
+                                self.parsedMessages[self.parsedMessages.length-1].bodyOffset = self.allmessages.indexOf(messagePieces[i]);
                                 self.parsedMessages[self.parsedMessages.length-1].bodyEnd = self.parsedMessages[self.parsedMessages.length-1].bodyOffset + messagePieces[i].length - 1;
                                 i = j;
                             }
@@ -151,9 +132,6 @@ SimpleHttpParser.prototype.getMessageType = function(str) {
     }
     else if (str.search(this.rqstLineRegex) == 0) {
         return "request";
-    }
-    else if (str.search(/[0-9a-fA-F] ?.*/)) {
-        return "chunklen";
     }
     else if (str.search(this.respLineRegex) != -1 &&
              str.search(this.rqstLineRegex) != -1) {
@@ -212,16 +190,55 @@ SimpleHttpParser.prototype.getNewMessageObj = function() {
 
 SimpleHttpParser.prototype.addBodyToParsedMessage = function(bodyStr) {
     this.parsedMessages[this.parsedMessages.length-1].entityBody = bodyStr;
-    this.parsedMessages[this.parsedMessages.length-1].bodyOffset = allmessages.indexOf(bodyStr);
+    this.parsedMessages[this.parsedMessages.length-1].bodyOffset = this.allmessages.indexOf(bodyStr);
     this.parsedMessages[this.parsedMessages.length-1].bodyEnd = this.parsedMessages[this.parsedMessages.length-1].bodyOffset + bodyStr.length - 1;
 }
 
 SimpleHttpParser.prototype.findAndMergeChunks = function(parts) {
 
     var totalParts = 0,
-        splitChunks = parts.split("\r\n");
-
-        
+        splitChunks = parts[0].split("\r\n"),
+        chunkParts = [];
+    while (totalParts < parts.length) {
+        totalParts++;
+        var terminator = splitChunks.indexOf("0");
+        if (terminator == splitChunks.length-1) {
+            console.log("number of splitCHunks: "+splitChunks.length);
+            var i = 0,
+                j = i+1;
+            while (j < splitChunks.length) {
+                if (splitChunks[j+1].search(/^[0-9a-fA-F]+$/) != -1) {
+                    console.log("found next chunklen at j+1 where j == "+j+"\n"+splitChunks[j+1]);
+                    if (this.verifyChunk(splitChunks[i], splitChunks[j])) {
+                        i = j+1;
+                        j = i+1;
+                        console.log("verified chunk, i == "+i+" j == "+j);
+                    }
+                    else if (j == i+1) {
+                        console.log("j == i+1 case");
+                        throw "malformed chunk length";
+                    }
+                    else if (this.verifyChunk(splitChunks[i], splitChunks.slice(i+1,j+1).join("\r\n"))) {
+                        i = j+1;
+                        j = i+1;
+                        console.log("verified chunk, i == "+i+" j == "+j);
+                    }
+                    else {
+                        console.log("i == "+i+" j == "+j);
+                        throw "malformed chunk length";
+                    }
+                }
+                else {
+                    j++;
+                    console.log("fell through to increment j alone, j == "+j+" i == "+i);
+                }
+            }
+            return {parts:totalParts, chunkBody:splitChunks.join("\r\n")};
+        }
+        else {
+            splitChunks.concat(parts[totalParts]);
+        }
+    }
 }
 
 SimpleHttpParser.prototype.verifyChunk = function(chunklen, content) {

@@ -3,45 +3,51 @@
 var spawn = require("child_process").spawn,
     Args = require("commander"),
     fs = require("fs"),
+    path = require("path"),
     async = require("async"),
     Handlebars = require("handlebars"),
-    SHP = require("SimpleHttpParser")
+    SHP = require("./SimpleHttpParser")
 ;
 Args
     .version("0.0.1")
     .option("-d --flowdir [directory]", "directory containing list of flows. default is  "+DEFAULT_FLOWDIR)
     .option("-w --wireshark", "causes the search for flows to expect one file per tcp connectioin. without this option we look for tcpflow style file names")
-    .option("-p --pcap [filename]", "pcap file.  if omitted, the directory specified by --flowdir is consulted. the --wireshark argument is ignored"),
+    .option("-p --pcap [filename]", "pcap file.  if omitted, the directory specified by --flowdir is consulted. the --wireshark argument is ignored")
     .option("--complete", "only dump complete flows (where we see handshake and close of the stream)")
     .parse(process.argv);
 
 var DEFAULT_FLOWDIR = "./flows",
     flowDir = Args.flowdir || DEFAULT_FLOWDIR,
-    TCPFLOW_READOPT = "-r"
+    TCPFLOW_READOPT = "-r",
     asyncList = [],
     TEMPLATE_PATH = "/home/johnny/working/node/reproapp.tmpl.js";
 ;
 
-if (Args.wireshark && !Args.flowdir) {
-    console.err("Must specify --flowdir with --wireshark option");
-    process.exit(1);
-}
-
-if(Args.flowdir &&
-   Args.wireshark &&
-   !fs.existsSync(Args.flowdir)) {
-        console.err("Argument 'flowdir': "+Args.flowdir+" DOES NOT EXIST");
-        process.exit(1);
+if (!Args.flowdir) {
+    console.log("No directory specified, using default: ./flowdir");
+    if (! fs.existsSync(flowDir)) {
+        fs.mkdirSync(flowDir);
     }
 }
 
-if (Args.pcap && fs.existsSync(Args.pcap);
-    asyncList.push(doTcpFlow);
-}
-else {
-    console.err("could not stat "+Args.pcap+" :"+err);
+if(Args.flowdir && Args.wireshark && !fs.existsSync(Args.flowdir)) {
+    console.error("Argument 'flowdir': "+Args.flowdir+" DOES NOT EXIST");
     process.exit(1);
 }
+
+if (Args.pcap && fs.existsSync(Args.pcap)) {
+    asyncList.push(doTcpFlow);
+}
+/*
+else {
+    if (Args.pcap == undefined) {
+        console.error("\nMust specify a pcap file if we aren't doing wireshark files.\n\nexiting\n");
+    }
+    else {
+        console.error("could not stat --pcap argument: "+Args.pcap);
+    }
+    process.exit(1);
+}*/
 
 if (Args.complete) {
     TCPFLOW_READOPT = "-R"
@@ -49,60 +55,87 @@ if (Args.complete) {
 
 function doTcpFlow(callback) {
     var tcpflowChild = spawn('tcpflow', ['-o', tcpflowDir, TCPFLOW_READOPT, Args.pcap]);
-    callback(null, tcpflowDir);
+    callback(null, {process:tcpflowChild, dir:tcpflowDir});
 }
 
-function parseFlows(callback) {
+function parseFlows(tcpflowProcess, callback) {
+    if (!callback) {
+        callback = tcpflowProcess;
+        tcpflowProcess = undefined;
+    }
     var fileDictObj = {files:{}, pairs:{}};
-    process.chdir(flowdir);
-    fs.readdir(flowdir, function(flowlist) {
-        flowlist.forEach(function(flowfile) {
-            var parser = SHP.SimpleHttpParser(flowfile);
-            fileDictObj.files[flowfile] = {
-                messages:parser.parsedMessages, wireshark:parser.isWireshark
-            };
-        }
-        var referenceTable = [],
-            pairs = {};
-        for (var i = 0; i < flowlist.length; i++) {
-            if (fileDictObj[flowlist[i]].isWireshark) {
-                // this file had no related pair, mark and skip
-                // why am I doing this? because I think I'm clever.. marking is not actually necessary
-                referenceTable[i] = true;
-                continue;
-            }
-            else if (referenceTable[i]) {
-                continue;
-            }
-            var currentPrefix = flowlist[i].split("-")[0];
-            for(var j = i+1; j < flowlist.length; j++) {
-                if (referenceTable[j]) {
-                    continue;
-                }
-                if (flowlist[j].search("-"+currentPrefix) != -1) {
-                    pairs[flowlist[i]] = flowlist[j];
-                    pairs[flowlist[j]] = flowlist[i];
-                    referenceTable[i] = true;
-                    referenceTable[j] = true;
-                }
-            }
-        }
-        fileDictObj.pairs = pairs;
-        callback(null, fileDictObj);
-    });
+    if (tcpflowProcess) {
+        tcpflowProcess.process.on("exit", parseFlowFilesInDir(callback, fileDictObj));
+    }
+    else {
+        parseFlowFilesInDir(callback, fileDictObj)();
+    }
 }
+
+function parseFlowFilesInDir(callback, fileDictObj) {
+//TODO: provide a well thought out comment to document what is happening here... if it works
+    return function() {
+        process.chdir(flowDir);
+        fs.readdir(process.cwd(), function(err, flowlist) {
+            if (err) {
+                console.error("Could not read flows from directory "+flowDir+"\n"+err);
+                process.exit(1);
+            }
+            for (var i = 0; i < flowlist.length; i++) {
+                var referenceTable = [], // keeps track of when files have been added to a pair
+                    pairs = {};
+                if (! flowlist[i].match(/^.+\.(txt|js|xml)$/)) {
+                    var parser = new SHP.SimpleHttpParser(path.resolve(process.cwd(), flowlist[i]));
+                    fileDictObj.files[flowlist[i]] = parser;
+                    console.log("assigned parser object to file dict: "+flowlist[i]);
+
+                    fileDictObj.files[flowlist[i]].on("done", function() {
+                        console.log("filedict at callback:\n"+JSON.stringify(fileDictObj,null,2));
+                        var idx = i;
+                        return function() {
+                            if (fileDictObj.files[flowlist[idx]].parser.isWireshark) {
+                        // this file had no related pair, mark and skip
+                        // why am I doing this? because I think I'm clever.. marking is not actually necessary
+                                referenceTable[idx] = true;
+                            }
+                            var currentPrefix = flowlist[idx].split("-")[0];
+                        };
+                        for(var j = idx+1; j < flowlist.length; j++) {
+                            if (referenceTable[j]) {
+                                continue;
+                            }
+                            if (flowlist[j].search("-"+currentPrefix) != -1) {
+                                pairs[flowlist[idx]] = flowlist[j];
+                                pairs[flowlist[j]] = flowlist[i];
+                                referenceTable[idx] = true;
+                                referenceTable[j] = true;
+                            }
+                        }
+                    });
+                }
+            }
+            fileDictObj.pairs = pairs;
+            callback(null, fileDictObj);
+        });
+    };
+}
+
+
 
 function makeTemplateValues(fileDictObj, callback) {
     var uriObjs = {uris:[]};
-    for (file in fileDictObj.files) {
-        if (fileDictObj.pairs != {} && fileDictObj[file].indexOf(file) != -1) {
+    for (var file in fileDictObj.files) {
+        if (fileDictObj.pairs != {}) {
     // 'file' is the key for one list of HTTP messages,
     // the other key is parsedFiles.pairs[file]
     // we know one file has the requests and the other has the responses
-            if (fileDictObj.files[file].messages.length != fileDictObj.files[fileDictObj.pairs[file]].messages.length) {
+            console.log("fileDictObj["+file+"] : "+JSON.stringify(fileDictObj.files[file],null,2));
+            console.log("pairs: "+JSON.stringify(fileDictObj.pairs,null,2));
+            if (fileDictObj.files[file].parsedMessages.length != fileDictObj.files[fileDictObj.pairs[file]].parsedMessages.length) {
                 throw "mismatch on number of request vs response objects in files:\n "+file+" : "+fileDictObj.pairs[file];
             }
             for (var i = 0; i < fileDictObj.files[file].messages.length; i++) {
+                throw "unimplemented, TODO: pick up from here";
                 // regex .exec match on messages[i].headerPart.start to get either status or uri
                 // depending on messages[i].type
             }

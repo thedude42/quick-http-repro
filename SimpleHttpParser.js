@@ -13,7 +13,7 @@ function SimpleHttpParser(messages) {
     this.respLineRegex = /HTTP\/([01]\.[091]) (\d{3}) ([A-Za-z ]+)\r\n/;
     this.isWireshark = false;
     this.parsedMessages = [];
-    this._multipartCollect = false;
+    this.counts = {requests:0, responses:0};
 
     httpMessageStream.on("data", function(chunk) {
         chunks.push(chunk);
@@ -37,6 +37,15 @@ function SimpleHttpParser(messages) {
                 messageObj.headerPart = self.parseHeaders(messagePieces[i]);
                 self.parsedMessages.push(messageObj);
                 console.log("OK: pushed new "+messageObj.type+" message headers, number parsedMessages: "+self.parsedMessages.length);
+                if (messageObj.type == "request") {
+                    self.counts.requests++;
+                }
+                else {
+                    self.counts.responses++;
+                }
+                if (self.counts.responses > 0 && self.counts.requests > 0) {
+                    self.isWireshark = true;
+                }
                 continue;
             }
             else if (messageObj.type == "empty") { // case: instances of multiple contiguous CRLFCRLF
@@ -50,7 +59,8 @@ function SimpleHttpParser(messages) {
                     throw "file "+inFile+" begins with an incomplete http message";
                 }
 
-                var contentLength = self.parsedMessages[self.parsedMessages.length-1].headerPart.headers["Content-Length"],
+                var contentLength =
+                    self.parsedMessages[self.parsedMessages.length-1].headerPart.headers["Content-Length"],
                     contentType =
                     self.parsedMessages[self.parsedMessages.length-1].headerPart.headers["Content-Type"],
                     transferEncoding =
@@ -63,18 +73,23 @@ function SimpleHttpParser(messages) {
                 }
                 else if (contentLength && contentLength > messagePieces[i].length) {
                     var clFramedObj = self.collectClFrame(messagePieces.slice(i), contentLength);
-                    //TODO: implement .collectClFrame and set content body, possibly ID wireshark message
+                    self.addBodyToParsedMessage(clFramedObj.body);
+                    i += clFramedObj.numParts - 1;
+                    if (clFramedObj.headers) {
+                        messageObj.type = "request";
+                        messageObj.headerPart = clFramedObj.header;
+                    }
                     continue;
                 }
-                else if (contentLength && contentLength < messagePieces[i].length &&
-                messageObj.type == "wireshark") { //wireshark style content-length body
-                    console.log("OK: processing WIRESHARK message");
+                else if (contentLength &&
+                contentLength < messagePieces[i].length) { // case: this part is the end of a body and headers of a new message
+                    console.log("OK: splitting body and header parts");
                     self.addBodyToParsedMessage(messagePieces[i].substr(0,contentLength));
                     // process the rest of the message as a header
                     messageObj.type =
-                     self.getMessageType(messagePieces[i].substr(contentLength,messagePieces[i].length));
+                     self.getMessageType(messagePieces[i].substr(contentLength));//,messagePieces[i].length));
                     messageObj.headerPart =
-                     self.parseHeaders(messagePieces[i].substr(contentLength,messagePieces[i].length));
+                     self.parseHeaders(messagePieces[i].substr(contentLength));//,messagePieces[i].length));
                     self.parsedMessages.push(messageObj);
                     continue;
                 }
@@ -114,8 +129,7 @@ SimpleHttpParser.prototype.getMessageType = function(str) {
         return "both";
     }
     else if (str.search(this.rqstLineRegex) > 0) {
-        this.isWireshark = true;
-        return "wireshark";
+        return "boundary";
     }
     else if (str == "") {
         return "empty";
@@ -172,25 +186,38 @@ SimpleHttpParser.prototype.addBodyToParsedMessage = function(bodyStr) {
 
 SimpleHttpParser.prototype.collectClFrame = function(bodyParts, byteLength) {
     var parts = [],
-        partsByteCount = 0;
+        partsByteCount = 0,
+        retObj = {body:"", bytes:partsByteCount, header:undefined, numParts:0};
     for (var i = 0; i < bodyParts.length; i++) {
         if (byteLength == partsByteCount) {
             break;
         }
         if (byteCount + bodyParts[i].length <= byteLength) {
             parts.push(bodyParts[i]);
+            retObj.numParts++;
             partsByteCount += bodyParts[i].length;
             continue;
         }
         else if (byteCount + bodyParts[i].length > byteLength) {
-            var currentType = this.getMessageType(bodyParts[i]);
-            if (currentType == "wireshark") {
-
+            var currentType = this.getMessageType(bodyParts[i]),
+                headStart;
+            if (currentType == "boundary") {
+                headStart = bodyParts[i].search(this.rqstLineRegex);
+                parts.push(bodyParts.slice(0, headStart));
+                partsByteCount += parts[parts.length -1].length;
+                if (partsByteCount != byteLength) {
+                    throw "incorrect content-length detected for message";
+                }
+                retObj.header = this.parseHeaders(bodyParts.slice(headStart));
+            }
+            else {
+                throw "malformed http message body or incorrect content-length";
             }
         }
-
-
     }
+    retObj.numParts = parts.length;
+    retObj.body = Buffer.concat(parts, partsByteCount);
+    return retObj;
 }
 
 SimpleHttpParser.prototype.findAndMergeChunks = function(parts) {

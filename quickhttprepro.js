@@ -38,21 +38,17 @@ if(Args.flowdir && Args.wireshark && !fs.existsSync(Args.flowdir)) {
 if (Args.pcap && fs.existsSync(Args.pcap)) {
     asyncList.push(doTcpFlow);
 }
-/*
-else {
-    if (Args.pcap == undefined) {
-        console.error("\nMust specify a pcap file if we aren't doing wireshark files.\n\nexiting\n");
-    }
-    else {
-        console.error("could not stat --pcap argument: "+Args.pcap);
-    }
-    process.exit(1);
-}*/
 
 if (Args.complete) {
     TCPFLOW_READOPT = "-R"
 }
 
+/* TODO: welcome to hell
+
+    Originally I aproached this whole thing synchronously.  then I built the SimpleHttpParser object
+    as an asynchronous file parser.  now I need to re-design.
+
+*/
 function doTcpFlow(callback) {
     var tcpflowChild = spawn('tcpflow', ['-o', tcpflowDir, TCPFLOW_READOPT, Args.pcap]);
     callback(null, {process:tcpflowChild, dir:tcpflowDir});
@@ -121,7 +117,7 @@ function parseFlowFilesInDir(callback, fileDictObj) {
 }
 
 
-
+//TODO: async hell: this function is called when other callbacks need to complete.
 function makeTemplateValues(fileDictObj, callback) {
     var uriObjs = {uris:[]};
     for (var file in fileDictObj.files) {

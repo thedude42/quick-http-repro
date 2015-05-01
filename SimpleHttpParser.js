@@ -9,7 +9,7 @@ function SimpleHttpParser(messages) {
         totalLen = 0,
         httpMessageStream = fs.createReadStream(messages);
     this.inFile = messages;
-    this.rqstLineRegex = /([A-Z]{3,10}) (\/.*)\r\n/;
+    this.rqstLineRegex = /([A-Z]{3,10}) (\/.*) HTTP\/[01]\.[091]\r\n/;
     this.respLineRegex = /HTTP\/([01]\.[091]) (\d{3}) ([A-Za-z ]+)\r\n/;
     this.isWireshark = false;
     this.parsedMessages = [];
@@ -152,6 +152,10 @@ SimpleHttpParser.prototype.parseHeaders = function(headers) {
     for (var i = 0; i < headerLines.length; i++) {
         if (i === 0) {
             headerObj["start"] = headerLines[i];
+            var match = this.rqstLineRegex.exec(headerObj["start"]+"\r\n");
+            if (match) {
+                headerObj["uri"] = match[2];
+            }
         }
         else if (headerLines[i] == "") {
             throw "SimpleHttpParser found a CRLFCRLF in the middle of a 'header'";

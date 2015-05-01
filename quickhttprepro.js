@@ -19,7 +19,6 @@ Args
 var DEFAULT_FLOWDIR = "./flows",
     flowDir = Args.flowdir || DEFAULT_FLOWDIR,
     TCPFLOW_READOPT = "-r",
-    asyncList = [],
     TEMPLATE_PATH = "/home/johnny/working/node/reproapp.tmpl.js";
 ;
 
@@ -30,7 +29,7 @@ if (!Args.flowdir) {
     }
 }
 
-if(Args.flowdir && Args.wireshark && !fs.existsSync(Args.flowdir)) {
+if(Args.flowdir && !fs.existsSync(Args.flowdir)) {
     console.error("Argument 'flowdir': "+Args.flowdir+" DOES NOT EXIST");
     process.exit(1);
 }
@@ -43,81 +42,81 @@ if (Args.complete) {
     TCPFLOW_READOPT = "-R"
 }
 
-/* TODO: welcome to hell
 
-    Originally I aproached this whole thing synchronously.  then I built the SimpleHttpParser object
-    as an asynchronous file parser.  now I need to re-design.
-
-*/
 function doTcpFlow(callback) {
-    var tcpflowChild = spawn('tcpflow', ['-o', tcpflowDir, TCPFLOW_READOPT, Args.pcap]);
-    callback(null, {process:tcpflowChild, dir:tcpflowDir});
-}
-
-function parseFlows(tcpflowProcess, callback) {
-    if (!callback) {
-        callback = tcpflowProcess;
-        tcpflowProcess = undefined;
-    }
-    var fileDictObj = {files:{}, pairs:{}};
-    if (tcpflowProcess) {
-        tcpflowProcess.process.on("exit", parseFlowFilesInDir(callback, fileDictObj));
+    if (Args.pcap) {
+        var tcpflowChild = spawn('tcpflow', ['-o', flowDir, TCPFLOW_READOPT, Args.pcap]);
+        tcpflowProcess.process.on("exit", callback(null, flowDir);
     }
     else {
-        parseFlowFilesInDir(callback, fileDictObj)();
+        callback(null, flowDir);
     }
 }
 
-function parseFlowFilesInDir(callback, fileDictObj) {
-//TODO: provide a well thought out comment to document what is happening here... if it works
-    return function() {
-        process.chdir(flowDir);
-        fs.readdir(process.cwd(), function(err, flowlist) {
-            if (err) {
-                console.error("Could not read flows from directory "+flowDir+"\n"+err);
-                process.exit(1);
-            }
-            for (var i = 0; i < flowlist.length; i++) {
-                var referenceTable = [], // keeps track of when files have been added to a pair
-                    pairs = {};
-                if (! flowlist[i].match(/^.+\.(txt|js|xml)$/)) {
-                    var parser = new SHP.SimpleHttpParser(path.resolve(process.cwd(), flowlist[i]));
-                    fileDictObj.files[flowlist[i]] = parser;
-                    console.log("assigned parser object to file dict: "+flowlist[i]);
-
-                    fileDictObj.files[flowlist[i]].on("done", function() {
-                        console.log("filedict at callback:\n"+JSON.stringify(fileDictObj,null,2));
-                        var idx = i;
-                        return function() {
-                            if (fileDictObj.files[flowlist[idx]].parser.isWireshark) {
-                        // this file had no related pair, mark and skip
-                        // why am I doing this? because I think I'm clever.. marking is not actually necessary
-                                referenceTable[idx] = true;
-                            }
-                            var currentPrefix = flowlist[idx].split("-")[0];
-                        };
-                        for(var j = idx+1; j < flowlist.length; j++) {
-                            if (referenceTable[j]) {
-                                continue;
-                            }
-                            if (flowlist[j].search("-"+currentPrefix) != -1) {
-                                pairs[flowlist[idx]] = flowlist[j];
-                                pairs[flowlist[j]] = flowlist[i];
-                                referenceTable[idx] = true;
-                                referenceTable[j] = true;
-                            }
-                        }
-                    });
-                }
-            }
-            fileDictObj.pairs = pairs;
-            callback(null, fileDictObj);
-        });
-    };
+function readDirectory(dir, callback) {
+    fs.readdir(dir, function(err, files) {
+        process.chdir(dir);
+        callback(null, files);
+    });
 }
 
+function parseAndAgregate(files, callback) {
+    var fileDictObj = {fileList:[], parsed:{}},
+        parseDone = parsedDoneGuardCb(fileDictObj, callback);
 
-//TODO: async hell: this function is called when other callbacks need to complete.
+    files.forEach(function(file) {
+        if (! file.match(/^.+\.(js|xml|txt)/)) {
+            fileDictObj.fileList.push(file);
+        }
+    });
+    fileDictObj.fileList.forEach(function(file) {
+        fileDictObj.parsed[file] = new SHP.SimpleHttpParser(path.resolve(process.cwd(), file));
+        fileDictObj.parsed[file].on("done", parseDone);
+    });
+
+}
+
+function parsedDoneGuardCb(fileDictObj, callback) {
+    var count = 0,
+        numFilesToParse = fileDictObj.files.length;
+    return function() {
+        count++;
+        if (count == numParsingFiles) {
+            console.log("Completed, expect fall through");
+            callback(null, agregateObj);
+        }
+    }
+}
+
+function makePairs(fileDictObj, callback) {
+    var referenceTable = [], // keeps track of when files have been added to a pair
+        files = fileDictObj.files,
+        pairs = {};
+    for (var i = 0; i < files.length; i++) {
+        var currentPrefix = files[i].split("-")[0];
+        if (referenceTable[i]) {
+            continue;
+        }
+        referenceTable[i] = true;
+        if (fileDictObj.parsed[files[i]].isWireshark) { //no pairs for wireshark flows
+            continue;
+        }
+        for(var j = i+1; j < files.length; j++) {
+            if (referenceTable[j]) {
+                continue;
+            }
+            if (files[j].search("-"+currentPrefix) != -1) {
+                pairs[files[i]] = files[j];
+                pairs[files[j]] = files[i];
+                referenceTable[j] = true;
+            }
+        }
+    }
+    fileDictObj.pairs = pairs;
+    callback(null, fileDictObj);
+}
+
+//TODO: evaluate how to use the current version of fileDictObj to fill out the template values
 function makeTemplateValues(fileDictObj, callback) {
     var uriObjs = {uris:[]};
     for (var file in fileDictObj.files) {
@@ -132,8 +131,7 @@ function makeTemplateValues(fileDictObj, callback) {
             }
             for (var i = 0; i < fileDictObj.files[file].messages.length; i++) {
                 throw "unimplemented, TODO: pick up from here";
-                // regex .exec match on messages[i].headerPart.start to get either status or uri
-                // depending on messages[i].type
+
             }
         }
         else if (fileDictObj.pairs == {}) {
@@ -148,7 +146,13 @@ function makeTemplateValues(fileDictObj, callback) {
 asyncList.push(parseFlows);
 asyncList.push(makeTemplateValues);
 
-async.waterfall(asyncList, function(err, templateFiller) {
+async.waterfall([
+    doTcpFlow,
+    readDirectory,
+    parseAndAgregate,
+    makePairs,
+    makeTemplateValues
+], function(err, templateFiller) {
     if (err) {
         console.err("Some task failed: "+err);
         process.exit(1);

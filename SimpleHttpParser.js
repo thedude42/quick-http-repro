@@ -163,9 +163,11 @@ SimpleHttpParser.prototype.parseHeaders = function(headers) {
         else {
             var aHeader = headerLines[i].split(":");
             if (aHeader.length != 2) {
-                headerObj.headers[aHeader[0]] = headerLines[i].substr(aHeader[0].length+1, headerLines.length);
+                headerObj.headers[aHeader[0].trim()] = headerLines[i].substr(aHeader[0].length+1).trim();
             }
-            headerObj.headers[aHeader[0].trim()] = aHeader[1].trim();
+            else {
+                headerObj.headers[aHeader[0].trim()] = aHeader[1].trim();
+            }
         }
     }
     if (headerObj["Content-Type"] &&

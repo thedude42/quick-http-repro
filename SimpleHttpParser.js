@@ -152,9 +152,17 @@ SimpleHttpParser.prototype.parseHeaders = function(headers) {
     for (var i = 0; i < headerLines.length; i++) {
         if (i === 0) {
             headerObj["start"] = headerLines[i];
-            var match = this.rqstLineRegex.exec(headerObj["start"]+"\r\n");
-            if (match) {
-                headerObj["uri"] = match[2];
+            var matchRqst = this.rqstLineRegex.exec(headerObj["start"]+"\r\n");
+            var matchResp = this.respLineRegex.exec(headerObj["start"]+"\r\n");
+            if (matchRqst) {
+                headerObj["uri"] = matchRqst[2];
+            }
+            else if (matchResp) {
+                headerObj["status_code"] = matchResp[2];
+                headerObj["status_message"] = matchResp[3];
+            }
+            else {
+                throw "could not match start line with request or response! : "+headers;
             }
         }
         else if (headerLines[i] == "") {

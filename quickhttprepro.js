@@ -4,6 +4,7 @@ var spawn = require("child_process").spawn,
     Args = require("commander"),
     fs = require("fs"),
     path = require("path"),
+    crypto = require("crypto"),
     async = require("async"),
     Handlebars = require("handlebars"),
     SHP = require("./SimpleHttpParser")
@@ -14,16 +15,18 @@ Args
     .option("-w --wireshark", "causes the search for flows to expect one file per tcp connectioin. without this option we look for tcpflow style file names")
     .option("-p --pcap [filename]", "pcap file.  if omitted, the directory specified by --flowdir is consulted. the --wireshark argument is ignored")
     .option("--complete", "only dump complete flows (where we see handshake and close of the stream)")
+    .option("-t --tcp-port [portnum]", "Port number to use in the http final application")
     .parse(process.argv);
 
 var DEFAULT_FLOWDIR = "./flows",
     flowDir = Args.flowdir || DEFAULT_FLOWDIR,
+    portnum = Args["tcp-port"] || 8000,
     TCPFLOW_READOPT = "-r",
-    TEMPLATE_PATH = "/home/johnny/working/node/reproapp.tmpl.js";
+    TEMPLATE_PATH = "./reproapp.tmpl.js";
 ;
 
 if (!Args.flowdir) {
-    console.log("No directory specified, using default: ./flowdir");
+    console.log("No directory specified, using default: "+flowDir);
     if (! fs.existsSync(flowDir)) {
         fs.mkdirSync(flowDir);
     }
@@ -46,7 +49,9 @@ if (Args.complete) {
 function doTcpFlow(callback) {
     if (Args.pcap) {
         var tcpflowChild = spawn('tcpflow', ['-o', flowDir, TCPFLOW_READOPT, Args.pcap]);
-        tcpflowProcess.process.on("exit", callback(null, flowDir);
+        tcpflowProcess.process.on("exit", function () {
+            callback(null, flowDir);
+        });
     }
     else {
         callback(null, flowDir);
@@ -61,15 +66,17 @@ function readDirectory(dir, callback) {
 }
 
 function parseAndAgregate(files, callback) {
-    var fileDictObj = {fileList:[], parsed:{}},
-        parseDone = parsedDoneGuardCb(fileDictObj, callback);
+    var fileDictObj = {"files":[], parsed:{}};
 
     files.forEach(function(file) {
         if (! file.match(/^.+\.(js|xml|txt)/)) {
-            fileDictObj.fileList.push(file);
+            fileDictObj.files.push(file);
         }
     });
-    fileDictObj.fileList.forEach(function(file) {
+
+    var parseDone = parsedDoneGuardCb(fileDictObj, callback);
+
+    fileDictObj.files.forEach(function(file) {
         fileDictObj.parsed[file] = new SHP.SimpleHttpParser(path.resolve(process.cwd(), file));
         fileDictObj.parsed[file].on("done", parseDone);
     });
@@ -81,9 +88,9 @@ function parsedDoneGuardCb(fileDictObj, callback) {
         numFilesToParse = fileDictObj.files.length;
     return function() {
         count++;
-        if (count == numParsingFiles) {
-            console.log("Completed, expect fall through");
-            callback(null, agregateObj);
+        if (count == numFilesToParse) {
+            console.log("** ALL FILES PARSE COMPLETE **");
+            callback(null, fileDictObj);
         }
     }
 }
@@ -117,34 +124,76 @@ function makePairs(fileDictObj, callback) {
 }
 
 //TODO: evaluate how to use the current version of fileDictObj to fill out the template values
+// goal: per uri we need a set of headers, bodyStart, bodyEnd, and body file.
 function makeTemplateValues(fileDictObj, callback) {
-    var uriObjs = {uris:[]};
-    for (var file in fileDictObj.files) {
-        if (fileDictObj.pairs != {}) {
-    // 'file' is the key for one list of HTTP messages,
-    // the other key is parsedFiles.pairs[file]
-    // we know one file has the requests and the other has the responses
-            console.log("fileDictObj["+file+"] : "+JSON.stringify(fileDictObj.files[file],null,2));
-            console.log("pairs: "+JSON.stringify(fileDictObj.pairs,null,2));
-            if (fileDictObj.files[file].parsedMessages.length != fileDictObj.files[fileDictObj.pairs[file]].parsedMessages.length) {
-                throw "mismatch on number of request vs response objects in files:\n "+file+" : "+fileDictObj.pairs[file];
-            }
-            for (var i = 0; i < fileDictObj.files[file].messages.length; i++) {
-                throw "unimplemented, TODO: pick up from here";
-
+    var uriObjs = {},
+        currentPair = {request:"", response:""},
+        lastUri = "",
+        absolutePath = "";
+    for (var file in fileDictObj.parsed) {
+        absolutePath = path.resolve(process.cwd(), file);
+        if (fileDictObj.parsed[file].isWireshark) {
+            for (var i = 0; i < fileDictObj.parsed[file].parsedMessages.length; i++) {
+                if (fileDictObj.parsed[file].parsedMessages[i].type == "request") {
+                    uriObjs[fileDictObj.parsed[file].parsedMessages[i].headerPart.uri] = {
+                        "file":absolutePath, "bodyStart":0, "bodyEnd":0,
+                        "responseHeaders":{}
+                    }
+                    lastUri = fileDictObj.parsed[file].parsedMessages[i].headerPart.uri;
+                }
+                else if (fileDictObj.parsed[file].parsedMessages[i].type == "response") {
+                    if (lastUri === "") {
+                        throw "Bad ordering of wireshark messages in file: "+file;
+                    }
+                    uriObjs[lastUri]["responseHeaders"] =  fileDictObj.parsed[file].parsedMessages[i].headerPart;
+                    uriObjs[lastUri]["bodyStart"] = fileDictObj.parsed[file].parsedMessages[i].bodyOffset;
+                    uriObjs[lastUri]["bodyEnd"] = fileDictObj.parsed[file].parsedMessages[i].bodyEnd;
+                    uriObjs[lastUri]["functionName"] = crypto.createHash('sha1').update(lastUri).digest('hex');
+                    lastUri = "";
+                }
+                else {
+                    throw "missparsed HTTP message: "+JSON.stringify(fileDictObj.parsed[file].parsedMessages[i], null,2);
+                }
             }
         }
-        else if (fileDictObj.pairs == {}) {
-            // do wireshark thing
-        }
-        else {
-            throw "file "+file+" does not have an associated pair";
+        else { // not wireshark
+            lastUri = ""; //reset this state variable that is wireshark specific
+            if (fileDictObj.pairs == {}) {
+                throw "no associated pairs for non-wireshark message, file: "+file;
+            }
+            for (var i = 0; i < fileDictObj.parsed[file].parsedMessages.length; i++) {
+                if (fileDictObj.parsed[file].parsedMessages[i].type == "request") {
+                    if (uriObjs[fileDictObj.parsed[file].parsedMessages[i].headerPart.uri]) {
+                        continue;
+                    }
+                    uriObjs[fileDictObj.parsed[file].parsedMessages[i].headerPart.uri] = {
+                        "file":absolutePath,
+                        "bodyStart":fileDictObj.parsed[fileDictObj.pairs[file]].parsedMessages[i].bodyOffset,
+                        "bodyEnd":fileDictObj.parsed[fileDictObj.pairs[file]].parsedMessages[i].bodyEnd,
+                        "responseHeaders":fileDictObj.parsed[fileDictObj.pairs[file]].parsedMessages[i].headerPart
+                    }
+                    uriObjs[fileDictObj.parsed[file].parsedMessages[i].headerPart.uri]["functionName"] = crypto.createHash('sha1').update(lastUri).digest('hex');
+                }
+                else if (fileDictObj.parsed[file].parsedMessages[i].type == "response") {
+                    if (uriObjs[fileDictObj.parsed[fileDictObj.pairs[file]].parsedMessages[i].headerPart.uri]) {
+                        continue;
+                    }
+                    uriObjs[fileDictObj.parsed[fileDictObj.pairs[file]].parsedMessages[i].headerPart.uri] = {
+                        "file":absolutePath,
+                        "bodyStart":fileDictObj.parsed[file].parsedMessages[i].bodyOffset,
+                        "bodyEnd":fileDictObj.parsed[file].parsedMessages[i].bodyEnd,
+                        "responseHeaders":fileDictObj.parsed[file].parsedMessages[i].headerPart
+                    }
+                    uriObjs[fileDictObj.parsed[fileDictObj.pairs[file]].parsedMessages[i].headerPart.uri]["functionName"] = crypto.createHash('sha1').update(lastUri).digest('hex');
+                }
+                else {
+                    throw "should not get here ever";
+                }
+            }
         }
     }
+    callback(null, uriObjs);
 }
-
-asyncList.push(parseFlows);
-asyncList.push(makeTemplateValues);
 
 async.waterfall([
     doTcpFlow,
@@ -152,13 +201,16 @@ async.waterfall([
     parseAndAgregate,
     makePairs,
     makeTemplateValues
-], function(err, templateFiller) {
+], function(err, uriObjs) {
     if (err) {
         console.err("Some task failed: "+err);
         process.exit(1);
     }
+    console.log(JSON.stringify(uriObjs, null, 2));
+    throw "stopping here for now";
     // do templatization
-    var source = "";
+    var source = "",
+        templateFiller = {uris: uriObjs, portnum:appPort};
     // var source = TEMPLATE_SOURCE
     var tmplStream = fs.createReadStream(TEMPLATE_PATH);
     tmplStream.on('data', function(chunk) {
@@ -167,5 +219,5 @@ async.waterfall([
     tmplStream.on('end', function() {
         var template = Handlebars.compile(source);
         functionText = template(templateFiller);
-    })
+    });
 });

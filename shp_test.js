@@ -6,7 +6,7 @@ var SHP = require("./SimpleHttpParser"),
 
 var parserJobs = 0,
     completedJobs = 0;
-
+/*
 function readDirectory(dir, callback) {
     fs.readdir(dir, function(err, files) {
         process.chdir(dir);
@@ -58,11 +58,17 @@ async.waterfall([
         console.log("done: "+JSON.stringify(result, null, 2));
     }
 });
+*/
 
-/*var parser = new SHP.SimpleHttpParser("packets/024.019.225.228.13836-096.126.115.201.00080");
+/*
+var parser = new SHP.SimpleHttpParser("packets/024.019.225.228.13836-096.126.115.201.00080");
 var parser = new SHP.SimpleHttpParser("096.126.115.201.00080-024.019.225.228.13836");
+*/
 var wiresharkparser = new SHP.SimpleHttpParser("test-data/wireshark.raw");
-
+wiresharkparser.on('done', function(obj) {
+    console.log(JSON.stringify(wiresharkparser, null, 2));
+});
+/*
 parser.on('done', function(obj) {
     console.log(JSON.stringify(parser, null, 2));
 });

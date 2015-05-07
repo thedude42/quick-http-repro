@@ -10,7 +10,7 @@ var spawn = require("child_process").spawn,
     SHP = require("./SimpleHttpParser")
 ;
 Args
-    .version("0.0.1")
+    .version("0.1.0")
     .option("-d --flowdir [directory]", "directory containing list of flows. default is  "+DEFAULT_FLOWDIR)
     .option("-w --wireshark", "causes the search for flows to expect one file per tcp connectioin. without this option we look for tcpflow style file names")
     .option("-p --pcap [filename]", "pcap file.  if omitted, the directory specified by --flowdir is consulted. the --wireshark argument is ignored")
@@ -20,7 +20,7 @@ Args
 
 var DEFAULT_FLOWDIR = "./flows",
     flowDir = Args.flowdir || DEFAULT_FLOWDIR,
-    portnum = Args["tcp-port"] || 8000,
+    portnum = Args.tcpPort || 8000, // because commander turned tcp-port in to tcpPort !!
     TCPFLOW_READOPT = "-r",
     TEMPLATE_PATH = "./reproapp.tmpl.js";
 ;
@@ -148,7 +148,7 @@ function makeTemplateValues(fileDictObj, callback) {
                     uriObjs[lastUri]["responseHeaders"] =  fileDictObj.parsed[file].parsedMessages[i].headerPart;
                     uriObjs[lastUri]["bodyStart"] = fileDictObj.parsed[file].parsedMessages[i].bodyOffset;
                     uriObjs[lastUri]["bodyEnd"] = fileDictObj.parsed[file].parsedMessages[i].bodyEnd;
-                    uriObjs[lastUri]["functionName"] = crypto.createHash('sha1').update(lastUri).digest('hex');
+                    uriObjs[lastUri]["functionName"] = "f"+crypto.createHash('sha1').update(lastUri).digest('hex');
                     lastUri = "";
                 }
                 else {
@@ -167,12 +167,12 @@ function makeTemplateValues(fileDictObj, callback) {
                         continue;
                     }
                     uriObjs[fileDictObj.parsed[file].parsedMessages[i].headerPart.uri] = {
-                        "file":absolutePath,
+                        "file":path.resolve(process.cwd(), fileDictObj.pairs[file]),
                         "bodyStart":fileDictObj.parsed[fileDictObj.pairs[file]].parsedMessages[i].bodyOffset,
                         "bodyEnd":fileDictObj.parsed[fileDictObj.pairs[file]].parsedMessages[i].bodyEnd,
                         "responseHeaders":fileDictObj.parsed[fileDictObj.pairs[file]].parsedMessages[i].headerPart
                     }
-                    uriObjs[fileDictObj.parsed[file].parsedMessages[i].headerPart.uri]["functionName"] = crypto.createHash('sha1').update(lastUri).digest('hex');
+                    uriObjs[fileDictObj.parsed[file].parsedMessages[i].headerPart.uri]["functionName"] = "f"+crypto.createHash('sha1').update(fileDictObj.parsed[file].parsedMessages[i].headerPart.uri).digest('hex');
                 }
                 else if (fileDictObj.parsed[file].parsedMessages[i].type == "response") {
                     if (uriObjs[fileDictObj.parsed[fileDictObj.pairs[file]].parsedMessages[i].headerPart.uri]) {
@@ -184,7 +184,7 @@ function makeTemplateValues(fileDictObj, callback) {
                         "bodyEnd":fileDictObj.parsed[file].parsedMessages[i].bodyEnd,
                         "responseHeaders":fileDictObj.parsed[file].parsedMessages[i].headerPart
                     }
-                    uriObjs[fileDictObj.parsed[fileDictObj.pairs[file]].parsedMessages[i].headerPart.uri]["functionName"] = crypto.createHash('sha1').update(lastUri).digest('hex');
+                    uriObjs[fileDictObj.parsed[fileDictObj.pairs[file]].parsedMessages[i].headerPart.uri]["functionName"] = "f"+crypto.createHash('sha1').update(fileDictObj.parsed[fileDictObj.pairs[file]].parsedMessages[i].headerPart.uri).digest('hex');
                 }
                 else {
                     throw "should not get here ever";
@@ -195,29 +195,94 @@ function makeTemplateValues(fileDictObj, callback) {
     callback(null, uriObjs);
 }
 
+function makeScript(uriObjs, callback) {
+    var outscript = fs.createWriteStream("./repro.js", {encoding:"utf-8"});
+    var scripBeginAndUriRouterStringPieces =[
+        "\"use strict\";",
+        "",
+        "var server = require(\"http\").createServer(uriRouter),",
+        "    fs = require(\"fs\");",
+        "",
+        "function uriRouter(req, resp) {",
+        "    switch(req.url) {"
+    ];
+    var scriptUriHandlerFunctions = [""];
+    console.log(JSON.stringify(uriObjs, null, 2));
+    for (var uri in uriObjs) {
+        scripBeginAndUriRouterStringPieces.
+        push("        case \""+uri+"\":");
+        scripBeginAndUriRouterStringPieces.
+        push("            "+uriObjs[uri].functionName+"(req, resp);");
+        scripBeginAndUriRouterStringPieces.
+        push("            break;");
+        scriptUriHandlerFunctions.
+        push("function "+uriObjs[uri].functionName+"(req, resp) {");
+        scriptUriHandlerFunctions.
+        push("    req.on(\"end\", function() {");
+        scriptUriHandlerFunctions.
+        push("        var chunks = [], totalLen = 0;");
+        scriptUriHandlerFunctions.
+        push("        resp.writeHead("+uriObjs[uri].responseHeaders.status_code+", \""+
+            uriObjs[uri].responseHeaders.status_message+"\", "+JSON.stringify(uriObjs[uri].responseHeaders.headers)+
+            ");");
+        if (uriObjs[uri].bodyStart) {
+            scriptUriHandlerFunctions.
+            push("        var body = fs.createReadStream(\""+uriObjs[uri].file+"\", {start:"+
+                uriObjs[uri].bodyStart+", end:"+uriObjs[uri].bodyEnd+"});");
+            scriptUriHandlerFunctions.
+            push("        body.on(\"data\", function(chunk) {");
+            scriptUriHandlerFunctions.
+            push("            chunks.push(chunk);");
+            scriptUriHandlerFunctions.
+            push("            totalLen += chunk.length;");
+            scriptUriHandlerFunctions.
+            push("        });");
+            scriptUriHandlerFunctions.
+            push("        body.on(\"end\", function() {");
+            scriptUriHandlerFunctions.
+            push("            chunks = Buffer.concat(chunks, totalLen);");
+            scriptUriHandlerFunctions.
+            push("            resp.end(chunks);");
+            scriptUriHandlerFunctions.
+            push("        });");
+        }
+        else {
+            scriptUriHandlerFunctions.
+            push("        resp.end();");
+        }
+        scriptUriHandlerFunctions.
+        push("    });");
+        scriptUriHandlerFunctions.
+        push("    req.resume()");
+        scriptUriHandlerFunctions.
+        push("}");
+        scriptUriHandlerFunctions.
+        push("");
+    }
+    scripBeginAndUriRouterStringPieces.push("    }");
+    scripBeginAndUriRouterStringPieces.push("}");
+    scriptUriHandlerFunctions.push("server.listen("+portnum+");");
+    outscript.on("open", function() {
+        outscript.write(scripBeginAndUriRouterStringPieces.join("\n"));
+        outscript.write(scriptUriHandlerFunctions.join("\n"));
+        outscript.end();
+        callback(null, true);
+    });
+}
+
 async.waterfall([
     doTcpFlow,
     readDirectory,
     parseAndAgregate,
     makePairs,
-    makeTemplateValues
-], function(err, uriObjs) {
+    makeTemplateValues,
+    makeScript
+], function(err, result) {
     if (err) {
         console.err("Some task failed: "+err);
         process.exit(1);
     }
-    console.log(JSON.stringify(uriObjs, null, 2));
-    throw "stopping here for now";
-    // do templatization
-    var source = "",
-        templateFiller = {uris: uriObjs, portnum:appPort};
-    // var source = TEMPLATE_SOURCE
-    var tmplStream = fs.createReadStream(TEMPLATE_PATH);
-    tmplStream.on('data', function(chunk) {
-        source += chunk;
-    });
-    tmplStream.on('end', function() {
-        var template = Handlebars.compile(source);
-        functionText = template(templateFiller);
-    });
+    //console.log(JSON.stringify(uriObjs, null, 2));
+    console.log("All tasks complete.");
+    //console.log(JSON.stringify(Args, null, 2));
 });

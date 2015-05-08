@@ -122,8 +122,6 @@ function makePairs(fileDictObj, callback) {
     callback(null, fileDictObj);
 }
 
-//TODO: evaluate how to use the current version of fileDictObj to fill out the template values
-// goal: per uri we need a set of headers, bodyStart, bodyEnd, and body file.
 function makeTemplateValues(fileDictObj, callback) {
     var uriObjs = {},
         currentPair = {request:"", response:""},

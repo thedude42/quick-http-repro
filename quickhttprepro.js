@@ -6,7 +6,6 @@ var spawn = require("child_process").spawn,
     path = require("path"),
     crypto = require("crypto"),
     async = require("async"),
-    Handlebars = require("handlebars"),
     SHP = require("./SimpleHttpParser")
 ;
 Args

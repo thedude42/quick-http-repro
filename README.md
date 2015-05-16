@@ -12,7 +12,7 @@
     --complete                only dump complete flows (where we see handshake and close of the stream)
     -t --tcp-port [portnum]   Port number to use in the http final application
 
-quickhttprepro.js is a node.js application that produces another node.js application.  The application that is produces is an http server that will serve byte-pre-byte response reproduction when the appropriate URI is requested.  There is no consideration of the request headers  or body when producing the response.
+quickhttprepro.js is a node.js application that produces another node.js application.  The application that is produces is an http server that will serve byte-per-byte response reproduction when the appropriate URI is requested.  There is no consideration of the request headers  or body when producing the response.
 
 SimpleHttpParser.js provides the parsing of a single file which contains HTTP messages. The messages can either be sequential requesr/response transactions (as one would get from a wireshark tcp stream) or the messages can be in the form of tcpflow output files.  SimpleHttpParser.js provides minimum validation of the http messages, namely that headers conform to RFC 7230, and that Content-Length or chunked Transfer-Encoding byte lengths are correct.
 

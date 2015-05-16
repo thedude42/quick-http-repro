@@ -36,10 +36,6 @@ if(Args.flowdir && !fs.existsSync(Args.flowdir)) {
     process.exit(1);
 }
 
-if (Args.pcap && fs.existsSync(Args.pcap)) {
-    asyncList.push(doTcpFlow);
-}
-
 if (Args.complete) {
     TCPFLOW_READOPT = "-R"
 }
@@ -48,7 +44,7 @@ if (Args.complete) {
 function doTcpFlow(callback) {
     if (Args.pcap) {
         var tcpflowChild = spawn('tcpflow', ['-o', flowDir, TCPFLOW_READOPT, Args.pcap]);
-        tcpflowProcess.process.on("exit", function () {
+        tcpflowChild.on("exit", function () {
             callback(null, flowDir);
         });
     }

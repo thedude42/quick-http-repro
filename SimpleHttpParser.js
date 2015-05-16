@@ -29,15 +29,15 @@ function SimpleHttpParser(messages) {
         var i = -1; // index in to messagePieces[] for current work item
         while ( i < messagePieces.length - 1 ) {
             i++;
-            //console.log("top of loop, i == "+i+", messagePieces.length: "+messagePieces.length);
+            //console.log("top of loop, i === "+i+", messagePieces.length: "+messagePieces.length);
             possibleMessages--;
             console.log("OK: "+ possibleMessages+" possible HTTP message left to parse");
             var messageObj = {type:self.getMessageType(messagePieces[i])}
-            if (messageObj.type == "request" || messageObj.type == "response") { // case: headers
+            if (messageObj.type === "request" || messageObj.type === "response") { // case: headers
                 messageObj.headerPart = self.parseHeaders(messagePieces[i]);
                 self.parsedMessages.push(messageObj);
                 console.log("OK: pushed new "+messageObj.type+" message headers, number parsedMessages: "+self.parsedMessages.length);
-                if (messageObj.type == "request") {
+                if (messageObj.type === "request") {
                     self.counts.requests++;
                 }
                 else {
@@ -48,14 +48,14 @@ function SimpleHttpParser(messages) {
                 }
                 continue;
             }
-            else if (messageObj.type == "empty") { // case: instances of multiple contiguous CRLFCRLF
-                if (i != messagePieces.length-1) {
+            else if (messageObj.type === "empty") { // case: instances of multiple contiguous CRLFCRLF
+                if (i !== messagePieces.length-1) {
                     console.log("WARN: empty string found in message pieces at index "+i);
                 }
                 continue;
             }
             else { // case: messagePieces[i] is not a single complete http header; likely http body data
-                if (i == 0) {
+                if (i === 0) {
                     throw "file "+inFile+" begins with an incomplete http message";
                 }
 
@@ -67,7 +67,7 @@ function SimpleHttpParser(messages) {
                     self.parsedMessages[self.parsedMessages.length-1].headerPart.headers["Transfer-Encoding"] ||
                     self.parsedMessages[self.parsedMessages.length-1].headerPart.headers["TE"];
 
-                if (contentLength && contentLength == messagePieces[i].length) { // happy path
+                if (contentLength && contentLength === messagePieces[i].length) { // happy path
                     self.addBodyToParsedMessage(messagePieces[i]);
                     continue;
                 }
@@ -98,7 +98,7 @@ function SimpleHttpParser(messages) {
                     var chunkedObj = self.findAndMergeChunks(messagePieces.slice(i));
                     self.addBodyToParsedMessage(chunkedObj.chunkBody);
                     i += chunkedObj.parts - 1;
-                    console.log("*** SETTING i == "+i+" AFTER PROCESSING CHUNKED ENCODING");
+                    console.log("*** SETTING i === "+i+" AFTER PROCESSING CHUNKED ENCODING");
                     continue;
                 }
                 /* TODO: need test coverage for cases where http bodies contain strings
@@ -118,24 +118,24 @@ function SimpleHttpParser(messages) {
 SimpleHttpParser.prototype.__proto__ = events.EventEmitter.prototype;
 
 SimpleHttpParser.prototype.getMessageType = function(str) {
-    if (str.search(this.respLineRegex) == 0) {
+    if (str.search(this.respLineRegex) === 0) {
         return "response";
     }
-    else if (str.search(this.rqstLineRegex) == 0) {
+    else if (str.search(this.rqstLineRegex) === 0) {
         return "request";
     }
-    else if (str.search(this.respLineRegex) != -1 &&
-             str.search(this.rqstLineRegex) != -1) {
+    else if (str.search(this.respLineRegex) !== -1 &&
+             str.search(this.rqstLineRegex) !== -1) {
         return "both";
     }
     else if (str.search(this.rqstLineRegex) > 0) {
         return "boundary";
     }
-    else if (str == "") {
+    else if (str === "") {
         return "empty";
     }
-    else if (str.search(this.respLineRegex) == -1 &&
-             str.search(this.rqstLineRegex) == -1) {
+    else if (str.search(this.respLineRegex) === -1 &&
+             str.search(this.rqstLineRegex) === -1) {
         return "body";
     }
     else {
@@ -165,12 +165,12 @@ SimpleHttpParser.prototype.parseHeaders = function(headers) {
                 throw "could not match start line with request or response! : "+headers;
             }
         }
-        else if (headerLines[i] == "") {
+        else if (headerLines[i] === "") {
             throw "SimpleHttpParser found a CRLFCRLF in the middle of a 'header'";
         }
         else {
             var aHeader = headerLines[i].split(":");
-            if (aHeader.length != 2) {
+            if (aHeader.length !== 2) {
                 headerObj.headers[aHeader[0].trim()] = headerLines[i].substr(aHeader[0].length+1).trim();
             }
             else {
@@ -179,7 +179,7 @@ SimpleHttpParser.prototype.parseHeaders = function(headers) {
         }
     }
     if (headerObj["Content-Type"] &&
-        headerObj["Content-Type"].search("multipart") != -1) {
+        headerObj["Content-Type"].search("multipart") !== -1) {
         this.multipartCollect = true;
     }
     else {
@@ -203,7 +203,7 @@ SimpleHttpParser.prototype.collectClFrame = function(bodyParts, byteLength) {
         partsByteCount = 0,
         retObj = {body:"", bytes:partsByteCount, header:undefined, numParts:0};
     for (var i = 0; i < bodyParts.length; i++) {
-        if (byteLength == partsByteCount) {
+        if (byteLength === partsByteCount) {
             break;
         }
         if (byteCount + bodyParts[i].length <= byteLength) {
@@ -215,11 +215,11 @@ SimpleHttpParser.prototype.collectClFrame = function(bodyParts, byteLength) {
         else if (byteCount + bodyParts[i].length > byteLength) {
             var currentType = this.getMessageType(bodyParts[i]),
                 headStart;
-            if (currentType == "boundary") {
+            if (currentType === "boundary") {
                 headStart = bodyParts[i].search(this.rqstLineRegex);
                 parts.push(bodyParts.slice(0, headStart));
                 partsByteCount += parts[parts.length -1].length;
-                if (partsByteCount != byteLength) {
+                if (partsByteCount !== byteLength) {
                     throw "incorrect content-length detected for message";
                 }
                 retObj.header = this.parseHeaders(bodyParts.slice(headStart));
@@ -242,35 +242,35 @@ SimpleHttpParser.prototype.findAndMergeChunks = function(parts) {
     while (totalParts < parts.length) {
         totalParts++;
         var terminator = splitChunks.indexOf("0");
-        if (terminator == splitChunks.length-1) {
+        if (terminator === splitChunks.length-1) {
             console.log("number of splitCHunks: "+splitChunks.length);
             var i = 0,
                 j = i+1;
             while (j < splitChunks.length) {
-                if (splitChunks[j+1].search(/^[0-9a-fA-F]+$/) != -1) {
-                    console.log("found next chunklen at j+1 where j == "+j+"\n"+splitChunks[j+1]);
+                if (splitChunks[j+1].search(/^[0-9a-fA-F]+$/) !== -1) {
+                    console.log("found next chunklen at j+1 where j === "+j+"\n"+splitChunks[j+1]);
                     if (this.verifyChunk(splitChunks[i], splitChunks[j])) {
                         i = j+1;
                         j = i+1;
-                        console.log("verified chunk, i == "+i+" j == "+j);
+                        console.log("verified chunk, i === "+i+" j === "+j);
                     }
-                    else if (j == i+1) {
-                        console.log("j == i+1 case");
+                    else if (j === i+1) {
+                        console.log("j === i+1 case");
                         throw "malformed chunk length";
                     }
                     else if (this.verifyChunk(splitChunks[i], splitChunks.slice(i+1,j+1).join("\r\n"))) {
                         i = j+1;
                         j = i+1;
-                        console.log("verified chunk, i == "+i+" j == "+j);
+                        console.log("verified chunk, i === "+i+" j === "+j);
                     }
                     else {
-                        console.log("i == "+i+" j == "+j);
+                        console.log("i === "+i+" j === "+j);
                         throw "malformed chunk length";
                     }
                 }
                 else {
                     j++;
-                    console.log("fell through to increment j alone, j == "+j+" i == "+i);
+                    console.log("fell through to increment j alone, j === "+j+" i === "+i);
                 }
             }
             console.log("total message parts used to complete chunk: "+totalParts);
@@ -285,7 +285,7 @@ SimpleHttpParser.prototype.findAndMergeChunks = function(parts) {
 SimpleHttpParser.prototype.verifyChunk = function(chunklen, content) {
     var len = parseInt("0x"+chunklen);
     console.log("chunk len: "+len+" content.len: "+content.length);
-    if (content.length != len) {
+    if (content.length !== len) {
         return false;
     };
     return true;

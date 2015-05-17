@@ -219,53 +219,53 @@ SimpleHttpParser.prototype.getBodyObj = function(bodyPieces, bodyObj) {
         }
     }
     else { // chunked transfer-encoding
-        bodyObj = this.findAndMergeChunks(bodyPieces);
-        return {bodyStr:bodyObj.chunkBody, numPieces:bodyObj.parts};
+        //bodyObj = this.findAndMergeChunks(bodyPieces);
+        //return {bodyStr:bodyObj.chunkBody, numPieces:bodyObj.parts};
+        return this.getChunkedBodyObj(bodyPieces, bodyObj);
     }
 }
 
-SimpleHttpParser.prototype.findAndMergeChunks = function(parts) {
-//TODO: this only deals with an \r\n showing up inside a chunk one time. better algoritmh needed to collect all
-    var totalParts = 0,
-        splitChunks = parts[0].split("\r\n"),
-        chunkParts = [],
-        i, j;
-    while (totalParts < parts.length) {
-        totalParts++;
-        var terminator = splitChunks.indexOf("0");
-        if (terminator === splitChunks.length-1) {
-            i = 0;
-            j = i+1;
-            while (j < splitChunks.length) {
-
-                if (splitChunks[j+1].search(/^[0-9a-fA-F]+$/) !== -1) {
-                    if (this.verifyChunk(splitChunks[i], splitChunks[j])) {
-                        i = j+1;
-                        j = i+1;
-                    }
-                    else if (j === i+1) {
-                        throw "malformed chunk length";
-                    }
-                    else if (this.verifyChunk(splitChunks[i], splitChunks.slice(i+1,j+1).join("\r\n"))) {
-                        i = j+1;
-                        j = i+1;
-                    }
-                    else {
-                        throw "malformed chunk length";
-                    }
-                }
-                else {
-                    j++;
-                }
-            }
-            return {parts:totalParts, chunkBody:splitChunks.join("\r\n")};
-        }
-        else {
-            splitChunks.concat(parts[totalParts]);
-            console.log("concatenating more chunk parts");
+SimpleHttpParser.prototype.getChunkedBodyObj = function(bodyPieces, bodyObj) {
+    if (bodyPieces[0] == undefined) {
+        throw "made to end of pieces without finding chunk terminator";
+    }
+    var piece = bodyPieces[0],
+        splitPiece = piece.split("\r\n"),
+        terminal = splitPiece.indexOf("0");
+    if (terminal === -1) {
+        bodyObj.bodyStr += piece;
+        bodyObj.numPieces += 1;
+        return this.getChunkedBodyObj(bodyPieces.slice(1), bodyObj);
+    }
+    else if (terminal === splitPiece.length - 1) {
+        bodyObj.bodyStr += piece;
+        if (this.validateChunkedBody(bodyObj.bodyStr.split("\r\n"))) {
+            bodyObj.numPieces += 1;
+            return bodyObj;
         }
     }
-    throw "could not locate chunked body";
+    else {
+        throw "found chunk terminator outside of CRLFCRLF boundary";
+    }
+}
+
+SimpleHttpParser.prototype.validateChunkedBody = function(entityChunks) {
+    var modifiedChunks = [];
+    if (entityChunks[0] === "0" && entityChunks.length === 1) {
+        return true;
+    }
+    else if (/[0-9a-fA-F]/.test(entityChunks[0])) {
+        if (this.verifyChunk(entityChunks[0], entityChunks[1])) {
+            return this.validateChunkedBody(entityChunks.slice(2));
+        }
+        else {
+            modifiedChunks.push(entityChunks[0]);
+            modifiedChunks.push(entityChunks[1]+"\r\n"+entityChunks[2]);
+            modifiedChunks = modifiedChunks.concat(entityChunks.slice(3));
+            return this.validateChunkedBody(modifiedChunks);
+        }
+    }
+    throw "malformed chunked entity";
 }
 
 SimpleHttpParser.prototype.verifyChunk = function(chunklen, content) {

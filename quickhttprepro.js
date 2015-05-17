@@ -74,6 +74,7 @@ function parseAndAgregate(files, callback) {
     fileDictObj.files.forEach(function(file) {
         fileDictObj.parsed[file] = new SHP.SimpleHttpParser(path.resolve(process.cwd(), file));
         fileDictObj.parsed[file].on("done", parseDone);
+        fileDictObj.parsed[file].init();
     });
 
 }
@@ -200,7 +201,7 @@ function makeScript(uriObjs, callback) {
         "    switch(req.url) {"
     ];
     var scriptUriHandlerFunctions = [""];
-    console.log(JSON.stringify(uriObjs, null, 2));
+    //console.log(JSON.stringify(uriObjs, null, 2));
     for (var uri in uriObjs) {
         scripBeginAndUriRouterStringPieces.
         push("        case \""+uri+"\":");

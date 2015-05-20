@@ -119,6 +119,7 @@ function makePairs(fileDictObj, callback) {
     callback(null, fileDictObj);
 }
 
+// TODO: include request headers in uriObjs
 function makeTemplateValues(fileDictObj, callback) {
     var uriObjs = {},
         currentPair = {request:"", response:""},
@@ -142,6 +143,7 @@ function makeTemplateValues(fileDictObj, callback) {
                     uriObjs[lastUri]["responseHeaders"] =  fileDictObj.parsed[file].parsedMessages[i].headerPart;
                     uriObjs[lastUri]["bodyStart"] = fileDictObj.parsed[file].parsedMessages[i].bodyOffset;
                     uriObjs[lastUri]["bodyEnd"] = fileDictObj.parsed[file].parsedMessages[i].bodyEnd;
+                    uriObjs[lastUri]["chunks"] = fileDictObj.parsed[file].parsedMessages[i].chunkMessages;
                     uriObjs[lastUri]["functionName"] = "f"+crypto.createHash('sha1').update(lastUri).digest('hex');
                     lastUri = "";
                 }
@@ -164,7 +166,8 @@ function makeTemplateValues(fileDictObj, callback) {
                         "file":path.resolve(process.cwd(), fileDictObj.pairs[file]),
                         "bodyStart":fileDictObj.parsed[fileDictObj.pairs[file]].parsedMessages[i].bodyOffset,
                         "bodyEnd":fileDictObj.parsed[fileDictObj.pairs[file]].parsedMessages[i].bodyEnd,
-                        "responseHeaders":fileDictObj.parsed[fileDictObj.pairs[file]].parsedMessages[i].headerPart
+                        "responseHeaders":fileDictObj.parsed[fileDictObj.pairs[file]].parsedMessages[i].headerPart,
+                        "chunks":fileDictObj.parsed[fileDictObj.pairs[file]].parsedMessages[i].chunkMessages
                     }
                     uriObjs[fileDictObj.parsed[file].parsedMessages[i].headerPart.uri]["functionName"] = "f"+crypto.createHash('sha1').update(fileDictObj.parsed[file].parsedMessages[i].headerPart.uri).digest('hex');
                 }
@@ -176,7 +179,8 @@ function makeTemplateValues(fileDictObj, callback) {
                         "file":absolutePath,
                         "bodyStart":fileDictObj.parsed[file].parsedMessages[i].bodyOffset,
                         "bodyEnd":fileDictObj.parsed[file].parsedMessages[i].bodyEnd,
-                        "responseHeaders":fileDictObj.parsed[file].parsedMessages[i].headerPart
+                        "responseHeaders":fileDictObj.parsed[file].parsedMessages[i].headerPart,
+                        "chunks":fileDictObj.parsed[file].parsedMessages[i].chunkMessages
                     }
                     uriObjs[fileDictObj.parsed[fileDictObj.pairs[file]].parsedMessages[i].headerPart.uri]["functionName"] = "f"+crypto.createHash('sha1').update(fileDictObj.parsed[fileDictObj.pairs[file]].parsedMessages[i].headerPart.uri).digest('hex');
                 }
@@ -189,6 +193,8 @@ function makeTemplateValues(fileDictObj, callback) {
     callback(null, uriObjs);
 }
 
+// TODO: insert comment for each switch case URI for the curl command that will
+//       replicate the client code (must fix makeTemplateValues to include request headers)
 function makeScript(uriObjs, callback) {
     var outscript = fs.createWriteStream("./repro.js", {encoding:"utf-8"});
     var scripBeginAndUriRouterStringPieces =[
@@ -235,8 +241,14 @@ function makeScript(uriObjs, callback) {
             push("        body.on(\"end\", function() {");
             scriptUriHandlerFunctions.
             push("            chunks = Buffer.concat(chunks, totalLen);");
-            scriptUriHandlerFunctions.
-            push("            resp.end(chunks);");
+            if (uriObjs[uri].chunks === undefined) {
+                scriptUriHandlerFunctions.
+                push("            resp.end(chunks);");
+            }
+            else {
+                scriptUriHandlerFunctions.
+                push("            doChunkStream(chunks, resp);");
+            }
             scriptUriHandlerFunctions.
             push("        });");
         }
@@ -253,6 +265,12 @@ function makeScript(uriObjs, callback) {
         scriptUriHandlerFunctions.
         push("");
     }
+    scriptUriHandlerFunctions.
+    push("");
+    scriptUriHandlerFunctions.
+    push(chunkfixer);
+    scriptUriHandlerFunctions.
+    push("");
     scripBeginAndUriRouterStringPieces.push("    }");
     scripBeginAndUriRouterStringPieces.push("}");
     scriptUriHandlerFunctions.push("server.listen("+portnum+");");
@@ -280,3 +298,41 @@ async.waterfall([
     console.log("All tasks complete.");
     //console.log(JSON.stringify(Args, null, 2));
 });
+
+var chunkfixer = 'function doChunkStream(chunks, resp) {\n    var splitChunks = chunks.split("\\r\\n"), i, currentContent = "";\n    for (i = 0; i < splitChunks.length; i += 2) {\n        if (splitChunks[i] === "0" && i === splitChunks.length - 1) {\n            resp.end();\n        }\n        else if (splitChunks[i+1] === splitChunks.length -1) {\n            throw "unimplemented: chunk extension";\n        }\n        else if (/[0-9a-fA-F]/.test(splitChunks[i])) {\n            currentContent += splitCHunks[i+1];\n        }\n        if (parseInt("0x"+splitChunks[i]) === currentContent.length) {\n            resp.write(currentContent);\n        }\n    }\n}';
+
+function doChunkStream(chunks, resp) {
+    var splitChunks = chunks.toString('ascii').split("\r\n"),
+    i = 0,
+    contentStart = 0, contentEnd = -2,
+    currentLen;
+    splitChunks.pop();
+    splitChunks.pop();
+    console.log(splitChunks)
+    while (i < splitChunks.length) {
+        if (splitChunks[i] === "0" && i === splitChunks.length - 1) {
+            console.log("ended")
+            resp.end();
+            i += 1;
+            continue;
+        }
+        else if (splitChunks[i+1] === splitChunks.length -1) {
+            throw "unimplemented: chunk extension";
+        }
+        else if (/^[0-9a-fA-F]+$/.test(splitChunks[i])) {
+            currentLen = splitChunks[i];
+            contentStart = contentEnd + splitChunks[i].length + 4;
+            contentEnd = contentStart + parseInt("0x"+currentLen, 16);
+            i += 2;
+        }
+        else {
+            contentEnd += 2+splitChunks[i].length;
+            i += 1;
+        }
+        console.log("i: "+i+" chunklen: "+parseInt("0x"+currentLen, 16)+" contentlen: "+(contentEnd - contentStart))
+        if (parseInt("0x"+currentLen, 16) === contentEnd-contentStart) {
+            resp.write(chunks.slice(contentStart, contentEnd));
+        }
+    }
+    console.log("OUT OF LOOP: i: "+i+" chunklen: "+parseInt("0x"+currentLen, 16));
+}

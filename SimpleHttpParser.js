@@ -26,27 +26,21 @@ SimpleHttpParser.prototype.init = function() {
     httpMessageStream.on('end', function() {
         var messagePieces,
             possibleMessages,
-            clFramedObj,
             messageObj,
             bodyObj,
             i = 0,
             contentLength,
-            contentType,
             transferEncoding;
-        chunks = Buffer.concat(chunks, totalLen)
+        chunks = Buffer.concat(chunks, totalLen);
         console.log("OK: stream read complete for "+self.inFile+". #chunks:"+chunks.length+" totalLen: "+totalLen);
         self.allmessages = chunks.toString('ascii');
         messagePieces = self.allmessages.split("\r\n\r\n"); // our "tokenizer"
         possibleMessages = messagePieces.length+1
         console.log("OK: identified "+messagePieces.length+" potential HTTP messages in stream")
         while ( i < messagePieces.length - 1 ) {
-            //console.log("top of loop, i === "+i+", messagePieces.length: "+messagePieces.length);
-            possibleMessages -= 1;
+            possibleMessages -= 1; // this smells funny
             console.log("OK: "+ possibleMessages+" possible HTTP message left to parse");
-            messageObj = {type:self.getMessageType(messagePieces[i])}
-            //console.log(messageObj.type);
-            //console.log(messagePieces[i].length);
-            //console.log(messagePieces[i]);
+            messageObj = {type:self.getMessageType(messagePieces[i])};
             if (messageObj.type === "request" || messageObj.type === "response") { // case: headers
                 messageObj.headerPart = self.parseHeaders(messagePieces[i]);
                 self.parsedMessages.push(messageObj);
@@ -56,9 +50,6 @@ SimpleHttpParser.prototype.init = function() {
                 }
                 else {
                     self.counts.responses += 1;
-                }
-                if (self.counts.responses > 0 && self.counts.requests > 0) {
-                    self.isWireshark = true;
                 }
                 i += 1;
             }
@@ -74,25 +65,27 @@ SimpleHttpParser.prototype.init = function() {
                 }
                 contentLength =
                     self.parsedMessages[self.parsedMessages.length-1].headerPart.headers["Content-Length"];
-                contentType =
-                    self.parsedMessages[self.parsedMessages.length-1].headerPart.headers["Content-Type"];
                 transferEncoding =
                     self.parsedMessages[self.parsedMessages.length-1].headerPart.headers["Transfer-Encoding"] ||
                     self.parsedMessages[self.parsedMessages.length-1].headerPart.headers["TE"];
                 if (contentLength) {
-                    bodyObj = self.getBodyObj(messagePieces.slice(i), {"contentLength":parseInt(contentLength),
-                                                                bodyStr:"",
-                                                                numPieces:0});
+                    bodyObj = self.getBodyObj(messagePieces.slice(i),
+                                {"contentLength":parseInt(contentLength), bodyStr:"", numPieces:0});
+                }
+                else if (transferEncoding) {
+                    bodyObj = self.getBodyObj(messagePieces.slice(i), {bodyStr:"", numPieces:0});
                 }
                 else {
-                    bodyObj = self.getBodyObj(messagePieces.slice(i), {bodyStr:"", numPieces:0});
+                    throw "no content-length or transfer-encoding!";
                 }
                 self.parsedMessages[self.parsedMessages.length-1].entityBody = bodyObj.bodyStr;
                 self.parsedMessages[self.parsedMessages.length-1].bodyOffset =
                     self.allmessages.indexOf(bodyObj.bodyStr);
-                    self.parsedMessages[self.parsedMessages.length-1].bodyEnd =
+                self.parsedMessages[self.parsedMessages.length-1].bodyEnd =
                     self.parsedMessages[self.parsedMessages.length-1].bodyOffset + bodyObj.bodyStr.length - 1;
+                self.parsedMessages[self.parsedMessages.length-1].chunkMessages = bodyObj.chunkMessages;
                 console.log("OK: appended body to previous message");
+
                 if (bodyObj.nextHeaders) {
                     if (bodyObj.nextHeaders.uri) {
                         messageObj.type = "request";
@@ -102,15 +95,15 @@ SimpleHttpParser.prototype.init = function() {
                         messageObj.type = "response";
                         self.counts.responses += 1;
                     }
-                    if (self.counts.responses > 0 && self.counts.requests > 0) {
-                        self.isWireshark = true;
-                    }
                     messageObj.headerPart = bodyObj.nextHeaders;
                     self.parsedMessages.push(messageObj);
                     console.log("OK: pushed "+messageObj.type+" message headers after body; number parsedMessages: "+self.parsedMessages.length);
                 }
                 i += bodyObj.numPieces;
             }
+        }
+        if (self.counts.responses > 0 && self.counts.requests > 0) {
+            self.isWireshark = true;
         }
         console.log("OK: parsed all messages");
         self.emit('done', self.parsedMessages);
@@ -181,13 +174,6 @@ SimpleHttpParser.prototype.parseHeaders = function(headers) {
             }
         }
     }
-    if (headerObj["Content-Type"] &&
-        headerObj["Content-Type"].search("multipart") !== -1) {
-        this.multipartCollect = true;
-    }
-    else {
-        this.multipartCollect = false;
-    }
     return headerObj;
 }
 
@@ -219,8 +205,6 @@ SimpleHttpParser.prototype.getBodyObj = function(bodyPieces, bodyObj) {
         }
     }
     else { // chunked transfer-encoding
-        //bodyObj = this.findAndMergeChunks(bodyPieces);
-        //return {bodyStr:bodyObj.chunkBody, numPieces:bodyObj.parts};
         return this.getChunkedBodyObj(bodyPieces, bodyObj);
     }
 }
@@ -229,6 +213,7 @@ SimpleHttpParser.prototype.getChunkedBodyObj = function(bodyPieces, bodyObj) {
     if (bodyPieces[0] == undefined) {
         throw "made to end of pieces without finding chunk terminator";
     }
+    bodyObj.chunkMessages = true;
     var piece = bodyPieces[0],
         splitPiece = piece.split("\r\n"),
         terminal = splitPiece.indexOf("0");
@@ -239,8 +224,18 @@ SimpleHttpParser.prototype.getChunkedBodyObj = function(bodyPieces, bodyObj) {
     }
     else if (terminal === splitPiece.length - 1) {
         bodyObj.bodyStr += piece;
-        if (this.validateChunkedBody(bodyObj.bodyStr.split("\r\n"))) {
+        if (this.validateChunkedBody(bodyObj.bodyStr.split("\r\n"), bodyObj)) {
             bodyObj.numPieces += 1;
+            bodyObj.bodyStr+="\r\n\r\n";
+            return bodyObj;
+        }
+    }
+    else if (terminal === splitPiece.length - 2) {
+        // assume a chunk extention
+        splitPiece = bodyObj.bodyStr.split("\r\n");
+        if (this.validateChunkedBody(splitPiece)) {
+            bodyObj.numPieces += 1;
+            bodyObj.bodyStr+="\r\n"+splitPiece[splitPiece.length - 1]+"\r\n";
             return bodyObj;
         }
     }
@@ -249,20 +244,21 @@ SimpleHttpParser.prototype.getChunkedBodyObj = function(bodyPieces, bodyObj) {
     }
 }
 
-SimpleHttpParser.prototype.validateChunkedBody = function(entityChunks) {
+SimpleHttpParser.prototype.validateChunkedBody = function(entityChunks, bodyObj) {
     var modifiedChunks = [];
-    if (entityChunks[0] === "0" && entityChunks.length === 1) {
+    if (entityChunks[0] === "0" && (entityChunks.length === 1 || entityChunks === 2)) {
         return true;
     }
     else if (/[0-9a-fA-F]/.test(entityChunks[0])) {
         if (this.verifyChunk(entityChunks[0], entityChunks[1])) {
-            return this.validateChunkedBody(entityChunks.slice(2));
+            bodyObj.chunkMessages.push(entityChunks[1]);
+            return this.validateChunkedBody(entityChunks.slice(2), bodyObj);
         }
         else {
             modifiedChunks.push(entityChunks[0]);
             modifiedChunks.push(entityChunks[1]+"\r\n"+entityChunks[2]);
             modifiedChunks = modifiedChunks.concat(entityChunks.slice(3));
-            return this.validateChunkedBody(modifiedChunks);
+            return this.validateChunkedBody(modifiedChunks, bodyObj);
         }
     }
     throw "malformed chunked entity";

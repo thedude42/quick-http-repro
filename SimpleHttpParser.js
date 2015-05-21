@@ -213,7 +213,7 @@ SimpleHttpParser.prototype.getChunkedBodyObj = function(bodyPieces, bodyObj) {
     if (bodyPieces[0] == undefined) {
         throw "made to end of pieces without finding chunk terminator";
     }
-    bodyObj.chunkMessages = true;
+    bodyObj.chunkMessages = [];
     var piece = bodyPieces[0],
         splitPiece = piece.split("\r\n"),
         terminal = splitPiece.indexOf("0");
@@ -246,7 +246,8 @@ SimpleHttpParser.prototype.getChunkedBodyObj = function(bodyPieces, bodyObj) {
 
 SimpleHttpParser.prototype.validateChunkedBody = function(entityChunks, bodyObj) {
     var modifiedChunks = [];
-    if (entityChunks[0] === "0" && (entityChunks.length === 1 || entityChunks === 2)) {
+    console.log(bodyObj)
+    if (entityChunks[0] === "0" && (entityChunks.length >= 1 && entityChunks.length <= 3)) {
         return true;
     }
     else if (/[0-9a-fA-F]/.test(entityChunks[0])) {

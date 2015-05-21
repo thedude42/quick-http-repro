@@ -299,10 +299,10 @@ async.waterfall([
     //console.log(JSON.stringify(Args, null, 2));
 });
 
-var chunkfixer = 'function doChunkStream(chunks, resp) {\n    var splitChunks = chunks.split("\\r\\n"), i, currentContent = "";\n    for (i = 0; i < splitChunks.length; i += 2) {\n        if (splitChunks[i] === "0" && i === splitChunks.length - 1) {\n            resp.end();\n        }\n        else if (splitChunks[i+1] === splitChunks.length -1) {\n            throw "unimplemented: chunk extension";\n        }\n        else if (/[0-9a-fA-F]/.test(splitChunks[i])) {\n            currentContent += splitCHunks[i+1];\n        }\n        if (parseInt("0x"+splitChunks[i]) === currentContent.length) {\n            resp.write(currentContent);\n        }\n    }\n}';
+var chunkfixer = 'function doChunkStream(chunks, resp) {\n    var splitChunks = chunks.toString("ascii").split("\\r\\n"),\n    i = 0,\n    contentStart = 0, contentEnd = -2,\n    currentLen;\n    splitChunks.pop();\n    splitChunks.pop();\n    console.log(splitChunks)\n    while (i < splitChunks.length) {\n        if (splitChunks[i] === "0" && i === splitChunks.length - 1) {\n            console.log("ended")\n            resp.end();\n            i += 1;\n            continue;\n        }\n        else if (splitChunks[i+1] === splitChunks.length -1) {\n            throw "unimplemented: chunk extension";\n        }\n        else if (/^[0-9a-fA-F]+$/.test(splitChunks[i])) {\n            currentLen = splitChunks[i];\n            contentStart = contentEnd + splitChunks[i].length + 4;\n            contentEnd = contentStart + parseInt("0x"+currentLen, 16);\n            i += 2;\n        }\n        else {\n            contentEnd += 2+splitChunks[i].length;\n            i += 1;\n        }\n        console.log("i: "+i+" chunklen: "+parseInt("0x"+currentLen, 16)+" contentlen: "+(contentEnd - contentStart))\n        if (parseInt("0x"+currentLen, 16) === contentEnd-contentStart) {\n            resp.write(chunks.slice(contentStart, contentEnd));\n        }    }\n    console.log("OUT OF LOOP: i: "+i+" chunklen: "+parseInt("0x"+currentLen, 16));\n}';
 
 function doChunkStream(chunks, resp) {
-    var splitChunks = chunks.toString('ascii').split("\r\n"),
+    var splitChunks = chunks.toString("ascii").split("\r\n"),
     i = 0,
     contentStart = 0, contentEnd = -2,
     currentLen;

@@ -13,7 +13,7 @@ async.waterfall([
     qhr.readDirectory,
     qhr.parseAndAgregate,
     qhr.makePairs,
-    qhr.makeTemplateValues,
+    qhr.makeSourceData,
     qhr.makeScript
 ], function(err, result) {
     if (err) {

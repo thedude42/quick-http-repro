@@ -11,7 +11,7 @@ qhr.processArgs(process.argv);
 async.waterfall([
     qhr.doTcpFlow,
     qhr.readDirectory,
-    qhr.parseAndAgregate,
+    qhr.getParsedFiles,
     qhr.makePairs,
     qhr.makeSourceData,
     qhr.makeScript

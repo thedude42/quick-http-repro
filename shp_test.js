@@ -1,4 +1,4 @@
-var SHP = require("./SimpleHttpParser");
+var SHP = require("./lib/SimpleHttpParser");
 
 
 //var parser = new SHP.SimpleHttpParser("test-data/packets/024.019.225.228.13836-096.126.115.201.00080");

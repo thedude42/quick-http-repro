@@ -63,6 +63,7 @@ test("\nargv test: with -p only", function(t) {
     t.equal(libqhr.getArgsConfig().pcap, "test.pcap");
     t.equal(libqhr.getArgsConfig().flowDir, "flows");
     t.notOk(args.complete);
+    fs.rmdirSync("flows");
     t.end();
 });
 
@@ -103,7 +104,51 @@ test("\ntest doTcpflow, http.pcap", function(t) {
     })
 });
 
+test("\nparse a file: 096.126.115.201.00080-024.019.225.228.13836", function(t) {
+    t.plan(5);
+    reloadLibQHR();
+    t.deepEquals(defaultConfig, libqhr.getArgsConfig());
+    var testdir = "parseTestDir";
+    fs.mkdirSync(testdir);
+    libqhr.processArgs(["argv[0]", "argv[1]", "-d", testdir, "-p", "test-data/http.pcap"]);
+    libqhr.doTcpFlow(function(err) {
+        var files =[testdir+"/096.126.115.201.00080-024.019.225.228.13836"];
+        libqhr.getParsedFiles(files, function(err, fileDictObj) {
+            t.notOk(err);
+            console.log(Object.keys(fileDictObj));
+            t.equals(fileDictObj.files.length, 1);
+            t.notOk(fileDictObj.parsed[testdir+"/096.126.115.201.00080-024.019.225.228.13836"]
+            .isWireshark);
+            exec("rm -rf "+testdir, function(err) {
+                t.notOk(err);
+                t.end();
+            })
+        });
+    });
+});
 
+test("\nparse a file: wireshark.raw", function(t) {
+    t.plan(5);
+    reloadLibQHR();
+    t.deepEquals(defaultConfig, libqhr.getArgsConfig());
+    var testdir = "parseTestDir";
+    fs.mkdirSync(testdir);
+    libqhr.processArgs(["argv[0]", "argv[1]", "-d", testdir]);
+    libqhr.doTcpFlow(function(err) {
+        var files =["test-data/wireshark.raw"];
+        libqhr.getParsedFiles(files, function(err, fileDictObj) {
+            t.notOk(err);
+            console.log(Object.keys(fileDictObj.parsed["test-data/wireshark.raw"]));
+            t.equals(fileDictObj.files.length, 1);
+            t.ok(fileDictObj.parsed["test-data/wireshark.raw"].isWireshark)
+            console.log(fileDictObj.parsed.length)
+            exec("rm -rf "+testdir, function(err) {
+                t.notOk(err);
+                t.end();
+            })
+        });
+    });
+});
 
 function reloadLibQHR() {
     console.log("reloading libqhr")

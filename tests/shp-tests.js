@@ -7,6 +7,7 @@ var test = require("tape"),
 var testcase1 = new SHP.SimpleHttpParser("test-data/test-data/wireshark.raw");
 var testcase2a = new SHP.SimpleHttpParser("test-data/packets/024.019.225.228.13836-096.126.115.201.00080");
 var testcase2b = new SHP.SimpleHttpParser("test-data/packets/096.126.115.201.00080-024.019.225.228.13836");
+var testcase3 = new SHP.SimpleHttpParser("test-data/packets/198.232.125.120.00080-192.168.031.201.55215");
 
 test("\nSET "+ ++testset+" : Verify request types", function(t) {
     var stringCases = [

@@ -3,7 +3,6 @@
 var test = require("tape"),
     fs = require("fs"),
     crypto = require("crypto"),
-    through = require("through2"),
     exec = require("child_process").exec,
     reload = require('require-reload')(require),
     libqhr = require("../lib/libqhr"),

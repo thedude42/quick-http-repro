@@ -41,8 +41,8 @@ test("\nSET "+ ++testset+" : Verify headers", function(t) {
 
 test("\nSET "+ ++testset+" : Verify body data", function(t) {
     var bodyCases = [
-        { pieces:["\n\n\n\r\n","jkvfakjb","\r\n","\rmnmnkjnkjvw\n"],
-          bodyObj:{bodyStr:"",numPieces:[],contentLength:28} },
+        { pieces:["\r\n\n\n\n","\r\njkvfakjb","\r\n","\rmnmnkjnkjvw\n"],
+          bodyObj:{bodyStr:"",numPieces:[],contentLength:42} },
         { pieces:["10\r\naksnfkdlebaneksn\r\n10\r\na\r\nb\r\n\r\nabehtbak\r\n0"],
           bodyObj:{bodyStr:"",numPieces:[]} }
     ]

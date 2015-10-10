@@ -1,3 +1,4 @@
 node_modules/
 flows/
 .DS_Store
+*.swp

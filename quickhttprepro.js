@@ -14,7 +14,8 @@ async.waterfall([
     qhr.getParsedFiles,
     qhr.makePairs,
     qhr.makeSourceData,
-    qhr.makeScript
+    qhr.makeScript,
+    qhr.makeHosts
 ], function(err, result) {
     if (err) {
         console.err("Some task failed: "+err);
